@@ -1,0 +1,33 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+Cargo.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Build artifacts
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Editor temp files
+.#*
+\#*#
+
+# Test coverage
+lcov.info
+tarpaulin-report.html
