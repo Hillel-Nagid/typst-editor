@@ -5,8 +5,8 @@ pub mod layout;
 pub mod cursor;
 
 pub use algorithm::{ BidiParagraph, Direction, BidiInfo };
-pub use layout::{ VisualRun, VisualLine };
-pub use cursor::{ CursorMovement, MovementDirection };
+pub use layout::{ VisualRun, VisualLine, BidiLayoutEngine };
+pub use cursor::{ CursorMovement, MovementDirection, TextPosition };
 
 /// Common error types for bidi text processing
 #[derive(Debug, thiserror::Error)]

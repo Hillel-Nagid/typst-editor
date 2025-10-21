@@ -1,17 +1,30 @@
 //! UI components for the Typst editor
+//!
+//! This crate contains all the UI components for the Typst editor,
+//! organized by functionality as defined in the project plan.
 
-// pub mod editor-view;  // Can't use hyphens in Rust module names
-// pub mod preview-pane;
-// pub mod sidebar;
-// pub mod panels;
+#![recursion_limit = "2048"]
 
-// For now, we'll create placeholder modules
+// Main component modules
 pub mod editor_view;
 pub mod preview_pane;
 pub mod sidebar;
 pub mod panels;
 
+// Phase 3 modules
+pub mod rendering; // Phase 3.2: Text Rendering Pipeline
+pub mod syntax; // Phase 3.3: Syntax Highlighting
+pub mod input; // Phase 3.4: Input Handling
+pub mod decorations; // Phase 3.5: Decorations and Annotations
+
+// Re-export main components
 pub use editor_view::EditorView;
 pub use preview_pane::PreviewPane;
 pub use sidebar::Sidebar;
 pub use panels::Panel;
+
+// Re-export Phase 3 types for convenience
+pub use decorations::{ DecorationManager, InlineDecoration, GutterDecoration, HighlightRange };
+pub use input::{ InputHandler, KeyBindings };
+pub use rendering::{ TextShaper, FontManager, LineLayout, Viewport };
+pub use syntax::{ SyntaxHighlighter, Theme, ThemeManager };

@@ -146,6 +146,7 @@ pub struct UndoHistory {
     redo_stack: Vec<OperationGroup>,
     current_group: Option<OperationGroup>,
     max_operations: usize,
+    #[allow(dead_code)]
     max_memory_bytes: usize,
 }
 

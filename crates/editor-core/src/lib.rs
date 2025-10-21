@@ -8,9 +8,9 @@ pub mod selection;
 pub mod operations;
 
 // Re-export commonly used types
-pub use buffer::{ Buffer, BufferId, BufferSnapshot };
-pub use selection::{ Selection, Cursor, Position, Affinity };
-pub use operations::{ EditOperation, OperationType };
+pub use buffer::{ Buffer, BufferId, BufferSnapshot, LineEnding };
+pub use selection::{ Selection, Cursor, Position, Affinity, SelectionSet, Granularity };
+pub use operations::{ EditOperation, OperationType, UndoHistory };
 
 /// Version number for tracking buffer changes
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

@@ -1,11 +1,16 @@
 //! Text buffer implementation using rope data structure
 
+pub mod word_boundaries;
+
 use crate::{ EditorError, Result, Version };
 use crate::selection::Position;
+use crate::operations::{ EditOperation, OperationType, UndoHistory };
 use ropey::Rope;
 use serde::{ Deserialize, Serialize };
 use std::path::PathBuf;
 use unicode_segmentation::UnicodeSegmentation;
+
+pub use word_boundaries::WordBoundaryFinder;
 
 /// Unique identifier for a buffer
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -106,6 +111,7 @@ pub struct Buffer {
     line_ending: LineEnding,
     dirty: bool,
     read_only: bool,
+    undo_history: UndoHistory,
 }
 
 impl Buffer {
@@ -119,6 +125,7 @@ impl Buffer {
             line_ending: LineEnding::Lf,
             dirty: false,
             read_only: false,
+            undo_history: UndoHistory::new(),
         }
     }
 
@@ -133,6 +140,7 @@ impl Buffer {
             line_ending,
             dirty: false,
             read_only: false,
+            undo_history: UndoHistory::new(),
         }
     }
 
@@ -148,6 +156,7 @@ impl Buffer {
             line_ending,
             dirty: false,
             read_only: false,
+            undo_history: UndoHistory::new(),
         })
     }
 
@@ -300,6 +309,20 @@ impl Buffer {
         }
 
         let char_idx = self.position_to_char_idx(pos)?;
+
+        // Calculate cursor position after insertion
+        let lines_added = text.matches('\n').count();
+        let cursor_after = if lines_added > 0 {
+            let last_line_len = text.lines().last().unwrap_or("").len();
+            Position::new(pos.line + lines_added, last_line_len)
+        } else {
+            Position::new(pos.line, pos.column + text.len())
+        };
+
+        // Record operation for undo
+        let operation = EditOperation::insert(pos, text.to_string(), cursor_after);
+        self.undo_history.record_operation(operation);
+
         self.rope.insert(char_idx, text);
         self.version = self.version.next();
         self.dirty = true;
@@ -324,6 +347,11 @@ impl Buffer {
         }
 
         let deleted_text = self.rope.slice(start_idx..end_idx).to_string();
+
+        // Record operation for undo
+        let operation = EditOperation::delete(start, end, deleted_text.clone(), start);
+        self.undo_history.record_operation(operation);
+
         self.rope.remove(start_idx..end_idx);
         self.version = self.version.next();
         self.dirty = true;
@@ -332,9 +360,47 @@ impl Buffer {
 
     /// Replace a range of text
     pub fn replace(&mut self, start: Position, end: Position, text: &str) -> Result<String> {
-        let deleted = self.delete(start, end)?;
-        self.insert(start, text)?;
-        Ok(deleted)
+        if self.read_only {
+            return Err(EditorError::BufferError("Buffer is read-only".to_string()));
+        }
+
+        let start_idx = self.position_to_char_idx(start)?;
+        let end_idx = self.position_to_char_idx(end)?;
+
+        if start_idx > end_idx {
+            return Err(
+                EditorError::InvalidRange(
+                    format!("Start position {:?} is after end position {:?}", start, end)
+                )
+            );
+        }
+
+        let deleted_text = self.rope.slice(start_idx..end_idx).to_string();
+
+        // Calculate cursor position after replacement
+        let lines_added = text.matches('\n').count();
+        let cursor_after = if lines_added > 0 {
+            let last_line_len = text.lines().last().unwrap_or("").len();
+            Position::new(start.line + lines_added, last_line_len)
+        } else {
+            Position::new(start.line, start.column + text.len())
+        };
+
+        // Record operation for undo (as a single atomic operation)
+        let operation = EditOperation::replace(
+            start,
+            end,
+            deleted_text.clone(),
+            text.to_string(),
+            cursor_after
+        );
+        self.undo_history.record_operation(operation);
+
+        self.rope.remove(start_idx..end_idx);
+        self.rope.insert(start_idx, text);
+        self.version = self.version.next();
+        self.dirty = true;
+        Ok(deleted_text)
     }
 
     /// Save buffer to file
@@ -379,6 +445,258 @@ impl Buffer {
             total_chars: self.len_chars(),
             total_bytes: self.len_bytes(),
             longest_line_length: longest_line,
+        }
+    }
+
+    /// Undo the last operation
+    pub fn undo(&mut self) -> Result<Position> {
+        let group = self.undo_history.undo().ok_or(EditorError::UndoHistoryExhausted)?;
+
+        // Apply operations in reverse
+        for operation in group.operations.iter().rev() {
+            match operation.op_type {
+                OperationType::Insert => {
+                    // Undo insert by deleting
+                    if let Some(text) = &operation.inserted_text {
+                        let end_pos = if text.contains('\n') {
+                            let lines = text.matches('\n').count();
+                            let last_line_len = text.lines().last().unwrap_or("").len();
+                            Position::new(operation.start.line + lines, last_line_len)
+                        } else {
+                            Position::new(operation.start.line, operation.start.column + text.len())
+                        };
+
+                        let start_idx = self.position_to_char_idx(operation.start)?;
+                        let end_idx = self.position_to_char_idx(end_pos)?;
+                        self.rope.remove(start_idx..end_idx);
+                    }
+                }
+                OperationType::Delete => {
+                    // Undo delete by inserting
+                    if let Some(text) = &operation.deleted_text {
+                        let char_idx = self.position_to_char_idx(operation.start)?;
+                        self.rope.insert(char_idx, text);
+                    }
+                }
+                OperationType::Replace => {
+                    // Undo replace by reversing the operation
+                    if
+                        let (Some(inserted), Some(deleted)) = (
+                            &operation.inserted_text,
+                            &operation.deleted_text,
+                        )
+                    {
+                        let end_pos = if inserted.contains('\n') {
+                            let lines = inserted.matches('\n').count();
+                            let last_line_len = inserted.lines().last().unwrap_or("").len();
+                            Position::new(operation.start.line + lines, last_line_len)
+                        } else {
+                            Position::new(
+                                operation.start.line,
+                                operation.start.column + inserted.len()
+                            )
+                        };
+
+                        let start_idx = self.position_to_char_idx(operation.start)?;
+                        let end_idx = self.position_to_char_idx(end_pos)?;
+                        self.rope.remove(start_idx..end_idx);
+                        self.rope.insert(start_idx, deleted);
+                    }
+                }
+            }
+        }
+
+        self.version = self.version.next();
+        self.dirty = true;
+
+        // Return cursor position from first operation
+        Ok(
+            group.operations
+                .first()
+                .map(|op| op.cursor_before)
+                .unwrap_or(Position::zero())
+        )
+    }
+
+    /// Redo the last undone operation
+    pub fn redo(&mut self) -> Result<Position> {
+        let group = self.undo_history.redo().ok_or(EditorError::RedoHistoryExhausted)?;
+
+        // Apply operations in forward order
+        for operation in &group.operations {
+            match operation.op_type {
+                OperationType::Insert => {
+                    if let Some(text) = &operation.inserted_text {
+                        let char_idx = self.position_to_char_idx(operation.start)?;
+                        self.rope.insert(char_idx, text);
+                    }
+                }
+                OperationType::Delete => {
+                    if let Some(end) = operation.end {
+                        let start_idx = self.position_to_char_idx(operation.start)?;
+                        let end_idx = self.position_to_char_idx(end)?;
+                        self.rope.remove(start_idx..end_idx);
+                    }
+                }
+                OperationType::Replace => {
+                    if let (Some(end), Some(inserted)) = (operation.end, &operation.inserted_text) {
+                        let start_idx = self.position_to_char_idx(operation.start)?;
+                        let end_idx = self.position_to_char_idx(end)?;
+                        self.rope.remove(start_idx..end_idx);
+                        self.rope.insert(start_idx, inserted);
+                    }
+                }
+            }
+        }
+
+        self.version = self.version.next();
+        self.dirty = true;
+
+        // Return cursor position from last operation
+        Ok(
+            group.operations
+                .last()
+                .map(|op| op.cursor_after)
+                .unwrap_or(Position::zero())
+        )
+    }
+
+    /// Check if undo is available
+    pub fn can_undo(&self) -> bool {
+        self.undo_history.can_undo()
+    }
+
+    /// Check if redo is available
+    pub fn can_redo(&self) -> bool {
+        self.undo_history.can_redo()
+    }
+
+    /// Create a boundary in the undo history (force new undo group)
+    pub fn create_undo_boundary(&mut self) {
+        self.undo_history.create_boundary();
+    }
+
+    /// Clear undo/redo history
+    pub fn clear_undo_history(&mut self) {
+        self.undo_history.clear();
+    }
+
+    /// Delete previous grapheme cluster (backspace operation)
+    pub fn backspace(&mut self, pos: Position) -> Result<Position> {
+        if pos.line == 0 && pos.column == 0 {
+            return Ok(pos); // Already at start
+        }
+
+        if pos.column == 0 {
+            // At start of line - join with previous line
+            let prev_line_idx = pos.line - 1;
+            let prev_line = self.line(prev_line_idx)?;
+            // Count graphemes, excluding trailing newline
+            let prev_line_without_newline = prev_line.trim_end_matches(&['\n', '\r'][..]);
+            let prev_line_len = prev_line_without_newline.graphemes(true).count();
+
+            let start = Position::new(prev_line_idx, prev_line_len);
+            let end = pos;
+            self.delete(start, end)?;
+
+            Ok(start)
+        } else {
+            // Delete previous grapheme
+            let line_text = self.line(pos.line)?;
+            let graphemes: Vec<&str> = line_text.graphemes(true).collect();
+
+            if pos.column > 0 && pos.column <= graphemes.len() {
+                let start = Position::new(pos.line, pos.column - 1);
+                self.delete(start, pos)?;
+                Ok(start)
+            } else {
+                Ok(pos)
+            }
+        }
+    }
+
+    /// Delete next grapheme cluster (delete key operation)
+    pub fn delete_forward(&mut self, pos: Position) -> Result<Position> {
+        let line_text = self.line(pos.line)?;
+        let graphemes: Vec<&str> = line_text.graphemes(true).collect();
+
+        if pos.column >= graphemes.len() {
+            // At end of line - join with next line if exists
+            if pos.line + 1 < self.len_lines() {
+                let end = Position::new(pos.line + 1, 0);
+                self.delete(pos, end)?;
+            }
+            Ok(pos)
+        } else {
+            // Delete next grapheme
+            let end = Position::new(pos.line, pos.column + 1);
+            self.delete(pos, end)?;
+            Ok(pos)
+        }
+    }
+
+    /// Get word boundaries in a line
+    fn word_boundaries(&self, line_idx: usize) -> Result<Vec<usize>> {
+        let line = self.line(line_idx)?;
+        let mut boundaries = vec![0];
+
+        let graphemes: Vec<&str> = line.graphemes(true).collect();
+        let mut in_word = false;
+
+        for (i, grapheme) in graphemes.iter().enumerate() {
+            let is_word_char = grapheme.chars().all(|c| (c.is_alphanumeric() || c == '_'));
+
+            if is_word_char && !in_word {
+                boundaries.push(i);
+                in_word = true;
+            } else if !is_word_char && in_word {
+                boundaries.push(i);
+                in_word = false;
+            }
+        }
+
+        if in_word {
+            boundaries.push(graphemes.len());
+        }
+
+        Ok(boundaries)
+    }
+
+    /// Find next word boundary
+    pub fn next_word_boundary(&self, pos: Position) -> Result<Position> {
+        let boundaries = self.word_boundaries(pos.line)?;
+
+        for &boundary in &boundaries {
+            if boundary > pos.column {
+                return Ok(Position::new(pos.line, boundary));
+            }
+        }
+
+        // If at end of line, go to start of next line
+        if pos.line + 1 < self.len_lines() {
+            Ok(Position::new(pos.line + 1, 0))
+        } else {
+            Ok(pos)
+        }
+    }
+
+    /// Find previous word boundary
+    pub fn prev_word_boundary(&self, pos: Position) -> Result<Position> {
+        let boundaries = self.word_boundaries(pos.line)?;
+
+        for &boundary in boundaries.iter().rev() {
+            if boundary < pos.column {
+                return Ok(Position::new(pos.line, boundary));
+            }
+        }
+
+        // If at start of line, go to end of previous line
+        if pos.line > 0 {
+            let prev_line = self.line(pos.line - 1)?;
+            let col = prev_line.graphemes(true).count();
+            Ok(Position::new(pos.line - 1, col))
+        } else {
+            Ok(pos)
         }
     }
 }

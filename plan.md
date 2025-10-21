@@ -1,9 +1,11 @@
 # Native Cross-Platform Typst Editor - Detailed Specification
 
 ## Project Overview
+
 A high-performance native text editor for Typst documents with bidirectional text support (RTL/LTR), live preview capabilities, and full LSP integration, built using GPUI framework.
 
 ## Technology Stack
+
 - **UI Framework**: GPUI (Rust-based GPU-accelerated UI)
 - **Language**: Rust
 - **Text Processing**: Typst compiler + Typst LSP
@@ -18,6 +20,7 @@ A high-performance native text editor for Typst documents with bidirectional tex
 ### 1.1 Project Setup & Build Infrastructure
 
 **Repository Structure:**
+
 ```
 typst-editor/
 ├── crates/
@@ -42,8 +45,8 @@ typst-editor/
 │   │   ├── requests/          # Request management
 │   │   └── notifications/     # Notification handling
 │   └── ui-components/         # Reusable UI components
-│       ├── editor-view/       # Main editor component
-│       ├── preview-pane/      # Preview component
+│       ├── editor_view/       # Main editor component
+│       ├── preview_pane/      # Preview component
 │       ├── sidebar/           # File explorer, outline
 │       └── panels/            # Bottom panels (errors, search)
 ├── assets/
@@ -57,6 +60,7 @@ typst-editor/
 ```
 
 **Build Configuration:**
+
 - **macOS**: Universal binary (Intel + Apple Silicon), code signing, notarization
 - **Linux**: AppImage, Flatpak, and .deb packages, support for X11 and Wayland
 - **Windows**: MSIX installer, portable executable, proper DPI awareness
@@ -64,6 +68,7 @@ typst-editor/
 - **Dependencies**: Lock file management, security auditing, reproducible builds
 
 **Development Environment:**
+
 - Hot reload for UI development using GPUI's development features
 - Logging infrastructure with multiple verbosity levels
 - Debug overlays showing buffer state, bidi levels, LSP status
@@ -77,18 +82,21 @@ typst-editor/
 The application uses a centralized state management approach with GPUI's reactive model:
 
 1. **ApplicationState**:
+
    - Window management (multiple windows, workspace sessions)
    - Global settings and preferences
    - Recent files and projects
    - Theme and appearance state
 
 2. **WorkspaceState**:
+
    - Active project root directory
    - Open files and editor tabs
    - Split pane layout configuration
    - Sidebar and panel visibility
 
 3. **EditorState**:
+
    - Text buffer content and metadata
    - Cursor positions and selections (multiple cursors)
    - Scroll position and viewport
@@ -129,6 +137,7 @@ User Input → GPUI Event System → Action Dispatcher → State Updates → Re-
 ### 1.3 Data Models
 
 **Document Model:**
+
 - Unique document ID for tracking across the application
 - File path and metadata (last modified, read-only status)
 - Dirty flag for unsaved changes
@@ -137,6 +146,7 @@ User Input → GPUI Event System → Action Dispatcher → State Updates → Re-
 - Line ending style (LF, CRLF, CR) detection and preservation
 
 **Project Model:**
+
 - Project root directory
 - Main entry file detection (main.typ, index.typ, or user-specified)
 - Dependency tracking (imported files, assets)
@@ -145,6 +155,7 @@ User Input → GPUI Event System → Action Dispatcher → State Updates → Re-
 - Custom compiler arguments
 
 **Configuration Model:**
+
 - Hierarchical configuration: defaults → global → workspace → document
 - Hot reload of configuration changes without restart
 - Validation of configuration values with error reporting
@@ -160,6 +171,7 @@ User Input → GPUI Event System → Action Dispatcher → State Updates → Re-
 **Buffer Data Structure Specification:**
 
 The text buffer must support:
+
 - **Efficient random access**: O(log n) for most operations
 - **Efficient line-based operations**: Quick line number to offset conversion
 - **Efficient insertion/deletion**: Minimal copying on edits
@@ -179,6 +191,7 @@ The text buffer must support:
 **Buffer Metrics Tracking:**
 
 The buffer maintains real-time metrics:
+
 - Total lines, characters, bytes
 - Line lengths (for horizontal scrolling optimization)
 - Longest line length (affects rendering decisions)
@@ -188,6 +201,7 @@ The buffer maintains real-time metrics:
 **Undo/Redo System:**
 
 - **Operation History**: Each edit operation stores:
+
   - Operation type (insert, delete, replace)
   - Affected range (start, end positions)
   - Old content (for undo)
@@ -197,6 +211,7 @@ The buffer maintains real-time metrics:
   - Timestamp
 
 - **Grouping Strategy**:
+
   - Time-based: Operations within 1 second form a group
   - Semantic: Typing consecutive characters forms one undo step
   - Boundary detection: Whitespace, line breaks create boundaries
@@ -210,6 +225,7 @@ The buffer maintains real-time metrics:
 **Snapshot Mechanism:**
 
 Snapshots are immutable views of the buffer at a point in time:
+
 - Used by LSP for text synchronization without blocking edits
 - Used by compiler to ensure consistent compilation
 - Copy-on-write semantics: Share data with main buffer until divergence
@@ -223,11 +239,13 @@ Snapshots are immutable views of the buffer at a point in time:
 The editor must fully implement UAX #9 standard:
 
 1. **Paragraph Detection**:
+
    - Paragraph boundaries: hard line breaks (LF, CRLF, CR, PS)
    - Empty lines are separate paragraphs
    - Each paragraph processed independently for bidi resolution
 
 2. **Base Direction Determination**:
+
    - **Auto-detection**: Scan for first strong directional character
    - **Explicit override**: Support Unicode directional formatting characters:
      - RLE (U+202B): Right-to-left embedding
@@ -239,6 +257,7 @@ The editor must fully implement UAX #9 standard:
    - **User override**: Allow forcing paragraph direction via commands
 
 3. **Embedding Level Calculation**:
+
    - Resolve character embedding levels (0-125)
    - Handle nested embeddings correctly
    - Process explicit directional controls
@@ -253,6 +272,7 @@ The editor must fully implement UAX #9 standard:
 **Bidirectional Run Storage:**
 
 For each paragraph, store:
+
 ```
 BidiParagraph {
     base_direction: Direction (LTR/RTL),
@@ -279,6 +299,7 @@ BidiParagraph {
 **Mixed Direction Layout:**
 
 The editor must handle complex scenarios:
+
 - **Mixed scripts on same line**: Arabic and English in one paragraph
 - **Numbers in RTL text**: Numbers should flow LTR even in RTL context
 - **Punctuation handling**: Neutral characters inherit direction from context
@@ -289,6 +310,7 @@ The editor must handle complex scenarios:
 **Cursor Position Representation:**
 
 Each cursor has dual representation:
+
 - **Logical position**: (line, column) in source text, column in Unicode grapheme clusters
 - **Visual position**: (line, visual_column) in rendered output
 - **Affinity**: For bidi boundaries, affinity determines which direction the cursor prefers
@@ -298,23 +320,27 @@ Each cursor has dual representation:
 1. **Horizontal Movement (Arrow Keys)**:
 
    **Left Arrow**:
+
    - In LTR context: Move to previous visual position
    - In RTL context: Move to next visual position
    - At direction boundary: Use cursor affinity to determine behavior
    - With Ctrl/Cmd: Move by word boundaries (respecting direction)
 
    **Right Arrow**:
+
    - In LTR context: Move to next visual position
    - In RTL context: Move to previous visual position
    - At direction boundary: Jump to the other side
 
    **Implementation details**:
+
    - Convert cursor logical position to visual position
    - Move in visual space
    - Convert back to logical position
    - Update affinity based on movement direction
 
 2. **Vertical Movement (Up/Down Arrows)**:
+
    - Maintain "sticky" column: remember preferred visual column
    - Move to same visual column on target line
    - If target line is shorter, move to end of line
@@ -324,15 +350,18 @@ Each cursor has dual representation:
 3. **Jump Movement (Home/End)**:
 
    **Home Key**:
+
    - First press: Move to first non-whitespace character (visual start of content)
    - Second press: Move to beginning of line (visual start)
    - In RTL line: These are on the right side
 
    **End Key**:
+
    - Move to end of line (visual end)
    - In RTL line: This is on the left side
 
    **Ctrl+Home/End**:
+
    - Move to beginning/end of document
    - Preserve logical ordering (not visual)
 
@@ -345,6 +374,7 @@ Each cursor has dual representation:
 **Selection Handling:**
 
 **Selection Representation:**
+
 ```
 Selection {
     anchor: Position,        // Fixed point (where selection started)
@@ -357,16 +387,19 @@ Selection {
 **Selection Types**:
 
 1. **Character Selection** (default):
+
    - Extends character by character in visual order
    - Handles direction boundaries correctly
    - Shows selection highlight covering all characters from anchor to cursor
 
 2. **Word Selection** (double-click, Ctrl+Shift+Arrow):
+
    - Extends selection by whole words
    - Snap to word boundaries
    - Expand to include entire word under cursor initially
 
 3. **Line Selection** (triple-click):
+
    - Select entire lines including line break
    - Extend by lines with Shift+Up/Down
 
@@ -386,11 +419,13 @@ Selection {
 **Bidi Selection Edge Cases:**
 
 1. **Selection crossing direction boundary**:
+
    - Split selection into multiple visual regions
    - Each region highlighted separately
    - Ensure continuous logical selection despite visual gaps
 
 2. **Selection in nested embeddings**:
+
    - Calculate embedding levels for entire selection
    - Render highlight respecting visual reordering at each level
 
@@ -411,6 +446,7 @@ Selection {
 **Insertion Operations:**
 
 1. **Character Insertion**:
+
    - Respect bidi properties: inserted characters inherit direction from context
    - Update bidi information incrementally
    - Trigger syntax highlighting update
@@ -418,6 +454,7 @@ Selection {
    - Add to undo history
 
 2. **Paste Operation**:
+
    - Handle clipboard formats: plain text, rich text (extract plain)
    - Preserve line endings or normalize to document style
    - Handle large pastes efficiently (chunked operations)
@@ -432,16 +469,19 @@ Selection {
 **Deletion Operations:**
 
 1. **Backspace**:
+
    - Delete previous grapheme cluster
    - In RTL context, this is the visual-left character
    - Handle deletion at direction boundaries correctly
    - Smart deletion: if deleting whitespace after indent, remove entire indent level
 
 2. **Delete**:
+
    - Delete next grapheme cluster
    - In RTL context, this is the visual-right character
 
 3. **Word Deletion (Ctrl+Backspace/Delete)**:
+
    - Delete previous/next word
    - Respect word boundaries in current direction
 
@@ -468,7 +508,7 @@ EditorView
 ├── Gutter
 │   ├── LineNumbers
 │   ├── FoldingMarkers
-│   ├── Breakpoints/Markers
+│   ├── Markers
 │   └── GitDiff indicators
 ├── TextContent
 │   ├── LineRenderer (per visible line)
@@ -505,6 +545,7 @@ EditorView
 **Rendering Stages:**
 
 1. **Text Shaping**:
+
    - Use HarfBuzz (via rustybuzz) for complex text shaping
    - Handle ligatures, kerning, OpenType features
    - Script-specific shaping (Arabic joining, Devanagari combining marks)
@@ -512,6 +553,7 @@ EditorView
    - Cache shaped runs for identical text
 
 2. **Font Management**:
+
    - Font fallback chain: primary font → system fonts → default
    - Per-script font selection (Arabic text may use different font than Latin)
    - Font variations: weight, style, stretch
@@ -519,6 +561,7 @@ EditorView
    - Font metrics: ascent, descent, line gap for line height calculation
 
 3. **Glyph Positioning**:
+
    - Calculate baseline position for each line
    - Position glyphs according to shaping results
    - Apply subpixel positioning for smooth rendering (if GPU supports)
@@ -533,6 +576,7 @@ EditorView
 **Visual Line Calculation:**
 
 For each logical line, calculate visual lines (wrapped):
+
 ```
 VisualLine {
     logical_line: usize,               // Source line number
@@ -565,12 +609,14 @@ VisualTextRun {
 **Highlighting Architecture:**
 
 1. **Parser Integration**:
-   - Use tree-sitter-typst for parsing
+
+   - Use typst-syntax for parsing
    - Incremental parsing: re-parse only changed portions
    - Error recovery: continue parsing after syntax errors
    - Query language for highlight patterns
 
 2. **Token Classification**:
+
    - Keywords: #import, #let, #set, #show, etc.
    - Functions: built-in and user-defined
    - Variables and parameters
@@ -582,6 +628,7 @@ VisualTextRun {
    - Labels and references
 
 3. **Semantic Highlighting** (via LSP):
+
    - Variable references colored by type
    - Function calls colored by return type
    - Unused variables grayed out
@@ -608,6 +655,7 @@ VisualTextRun {
 **Keyboard Input Processing:**
 
 **Text Input:**
+
 - Use GPUI's text input events for character input
 - IME (Input Method Editor) support for CJK languages:
   - Show composition preview underline
@@ -619,6 +667,7 @@ VisualTextRun {
 **Key Bindings:**
 
 Implement comprehensive key binding system:
+
 - Default keymaps for each platform (Mac, Windows, Linux conventions)
 - User-customizable key bindings via config file
 - Multi-key sequences (e.g., Ctrl+K, Ctrl+C for comment)
@@ -626,6 +675,7 @@ Implement comprehensive key binding system:
 - Vim/Emacs keybinding emulation modes (optional)
 
 **Standard Editing Commands:**
+
 - Cursor movement: Arrow keys, Home/End, Page Up/Down
 - Selection: Shift+movement keys
 - Clipboard: Ctrl/Cmd+C/X/V
@@ -637,6 +687,7 @@ Implement comprehensive key binding system:
 **Mouse Input:**
 
 **Click Actions:**
+
 - Single click: position cursor
 - Double click: select word
 - Triple click: select line
@@ -646,17 +697,20 @@ Implement comprehensive key binding system:
 - Alt+drag: block selection
 
 **Scrolling:**
+
 - Mouse wheel: vertical scroll
 - Shift+wheel: horizontal scroll
 - Ctrl/Cmd+wheel: zoom in/out (change font size)
 - Trackpad gestures: two-finger scroll, pinch-to-zoom
 
 **Hover:**
+
 - Hover over symbols: show LSP hover information after 500ms delay
 - Hover over errors: show diagnostic details
 - Hover over links: show URL and make clickable
 
 **Touch Input (for tablets):**
+
 - Single tap: position cursor
 - Long press: show context menu
 - Two-finger drag: scroll
@@ -667,6 +721,7 @@ Implement comprehensive key binding system:
 **Inline Decorations:**
 
 1. **Error Squiggles**:
+
    - Red wavy underline for errors
    - Yellow wavy underline for warnings
    - Blue wavy underline for information
@@ -674,11 +729,13 @@ Implement comprehensive key binding system:
    - Hover shows full diagnostic message
 
 2. **Code Lens**:
+
    - Above functions: show type signature, documentation link
    - Above variables: show inferred type
    - Clickable to perform actions (go to definition, find references)
 
 3. **Inline Hints**:
+
    - Parameter names in function calls (when multiple args)
    - Inferred types for variables without explicit type
    - Shown in grayed-out text, can be toggled off
@@ -691,27 +748,26 @@ Implement comprehensive key binding system:
 **Gutter Decorations:**
 
 1. **Line Numbers**:
+
    - Show absolute line numbers by default
    - Option for relative line numbers (Vim-style)
    - Highlight current line number
    - Dim line numbers for wrapped continuation lines
 
 2. **Folding Markers**:
+
    - Triangle icons to fold/unfold code sections
    - Based on indentation or syntax tree
    - Fold entire functions, sections, etc.
    - Show summary of folded content on hover
 
 3. **Diagnostic Markers**:
+
    - Icon in gutter for lines with errors/warnings
    - Color-coded by severity
    - Click to show details or navigate to next/previous
 
-4. **Breakpoints** (for future debugging support):
-   - Dot icon to set/remove breakpoints
-   - Active during debug sessions
-
-5. **Git Diff Indicators**:
+4. **Git Diff Indicators**:
    - Green bar: added lines
    - Blue bar: modified lines
    - Red triangle: deleted lines (shown above)
@@ -734,6 +790,7 @@ Implement comprehensive key binding system:
 **LSP Communication Layer:**
 
 **Protocol Implementation:**
+
 - Full LSP 3.17 specification support
 - JSON-RPC 2.0 over stdio (Typst LSP runs as subprocess)
 - Message framing: Content-Length header parsing
@@ -744,6 +801,7 @@ Implement comprehensive key binding system:
 **Client Lifecycle:**
 
 1. **Initialization**:
+
    - Start Typst LSP subprocess with appropriate arguments
    - Send `initialize` request with client capabilities:
      - Text document sync (incremental)
@@ -765,6 +823,7 @@ Implement comprehensive key binding system:
    - Send `workspace/didChangeConfiguration` with settings
 
 2. **Document Synchronization**:
+
    - Send `textDocument/didOpen` when file opened
    - Send `textDocument/didChange` on edits (incremental changes only)
    - Include document version number (increments on each change)
@@ -782,12 +841,14 @@ Implement comprehensive key binding system:
 **Request Management:**
 
 **Request Queue:**
+
 - Prioritize user-facing requests (hover, completion) over background (diagnostics)
 - Cancel pending requests when new conflicting request arrives (e.g., new hover cancels old)
 - Timeout requests after 5 seconds, show error to user
 - Track pending requests for debugging and telemetry
 
 **Response Handling:**
+
 - Deserialize JSON responses using serde
 - Validate response structure (handle missing optional fields)
 - Update UI based on response (e.g., show completion list)
@@ -798,6 +859,7 @@ Implement comprehensive key binding system:
 **Diagnostics (Errors and Warnings):**
 
 **Receiving Diagnostics:**
+
 - Server sends `textDocument/publishDiagnostics` notifications
 - Contains URI, version, and list of diagnostics
 - Each diagnostic has:
@@ -809,6 +871,7 @@ Implement comprehensive key binding system:
   - Optional code actions (quick fixes)
 
 **Displaying Diagnostics:**
+
 - Underline text in editor with wavy line (color by severity)
 - Show icon in gutter
 - Add to problems panel (sortable, filterable list)
@@ -816,6 +879,7 @@ Implement comprehensive key binding system:
 - Navigate with F8/Shift+F8 (next/previous diagnostic)
 
 **Code Actions:**
+
 - Request available actions via `textDocument/codeAction`
 - Show lightbulb icon in gutter when actions available
 - Display menu of actions on click or keyboard shortcut
@@ -827,15 +891,18 @@ Implement comprehensive key binding system:
 **Completion:**
 
 **Triggering Completion:**
+
 - Automatic trigger after typing (configurable delay: 100-300ms)
 - Trigger characters: `.` for method completion, `#` for Typst commands
 - Manual trigger: Ctrl+Space
 
 **Request:**
+
 - Send `textDocument/completion` with cursor position
 - Include completion context (trigger kind and character)
 
 **Response Handling:**
+
 - Receive list of completion items, each with:
   - Label (displayed text)
   - Kind (function, variable, keyword, etc.)
@@ -848,6 +915,7 @@ Implement comprehensive key binding system:
   - Command to execute after insert (optional)
 
 **Completion UI:**
+
 - Show popup below/above cursor (depending on space)
 - Fuzzy matching: filter items as user types
 - Highlight matched characters
@@ -858,6 +926,7 @@ Implement comprehensive key binding system:
 - Show documentation panel on side for selected item
 
 **Snippet Support:**
+
 - Parse snippet syntax (LSP snippet format)
 - Tabstops: $1, $2, etc. for cursor positions
 - Placeholders: ${1:default} with default text
@@ -868,10 +937,12 @@ Implement comprehensive key binding system:
 **Hover Information:**
 
 **Request:**
+
 - Send `textDocument/hover` when user hovers over symbol
 - Debounce: wait 300ms before sending to avoid excessive requests
 
 **Response:**
+
 - Receive markdown content and optional range
 - Content may include:
   - Type information
@@ -880,6 +951,7 @@ Implement comprehensive key binding system:
   - Links to documentation
 
 **Display:**
+
 - Show in floating popup near cursor
 - Render markdown (headings, bold, italic, code blocks)
 - Syntax highlight code blocks in hover
@@ -890,15 +962,18 @@ Implement comprehensive key binding system:
 **Signature Help (Parameter Hints):**
 
 **Triggering:**
+
 - Automatic: when typing function call opening parenthesis
 - Trigger characters: `(` and `,`
 - Manual: Ctrl+Shift+Space
 
 **Request:**
+
 - Send `textDocument/signatureHelp` with cursor position
 - Include signature help context (trigger kind, active signature)
 
 **Response:**
+
 - List of overloaded signatures (if function has multiple variants)
 - Each signature contains:
   - Label (full function signature)
@@ -907,6 +982,7 @@ Implement comprehensive key binding system:
   - Active parameter index
 
 **Display:**
+
 - Floating popup above current line
 - Show all overloads with navigation arrows if multiple
 - Highlight active parameter in bold
@@ -917,14 +993,17 @@ Implement comprehensive key binding system:
 **Go To Definition/Declaration/Implementation:**
 
 **Request:**
+
 - Send `textDocument/definition` (or declaration/implementation)
 - Include cursor position
 
 **Response:**
+
 - Single location or list of locations (for multiple definitions)
 - Each location has URI and range
 
 **Navigation:**
+
 - Jump to definition in current editor if same file
 - Open new tab if different file
 - Show peek definition popup (inline preview) if configured
@@ -934,13 +1013,16 @@ Implement comprehensive key binding system:
 **Find References:**
 
 **Request:**
+
 - Send `textDocument/references`
 - Include context: whether to include declaration
 
 **Response:**
+
 - List of locations where symbol is referenced
 
 **Display:**
+
 - Show in bottom panel with grouped results
 - Group by file, show file path and line numbers
 - Preview of each reference with highlighting
@@ -950,10 +1032,12 @@ Implement comprehensive key binding system:
 **Document Symbols (Outline):**
 
 **Request:**
+
 - Send `textDocument/documentSymbol` for current file
 - Triggered on file open and after edits (debounced)
 
 **Response:**
+
 - Hierarchical list of symbols:
   - Name
   - Kind (function, variable, heading, etc.)
@@ -961,6 +1045,7 @@ Implement comprehensive key binding system:
   - Children symbols (nested structures)
 
 **Display:**
+
 - Sidebar panel showing document outline
 - Tree view with expand/collapse
 - Icons for different symbol kinds
@@ -971,13 +1056,16 @@ Implement comprehensive key binding system:
 **Workspace Symbols:**
 
 **Request:**
+
 - Send `workspace/symbol` with search query
 - Triggered by Ctrl+T or Cmd+T
 
 **Response:**
+
 - List of symbols across entire workspace matching query
 
 **Display:**
+
 - Quick-open popup with fuzzy search
 - Show symbol name, kind, file path
 - Navigate with arrows, Enter to open
@@ -986,14 +1074,17 @@ Implement comprehensive key binding system:
 **Rename Symbol:**
 
 **Request:**
+
 - Send `textDocument/rename` with position and new name
 - Show input box to user first for new name
 
 **Response:**
+
 - Workspace edit containing changes across all files
 - Changes include text edits with ranges
 
 **Execution:**
+
 - Preview changes in diff view before applying
 - Allow user to review and uncheck unwanted changes
 - Apply all edits atomically (all or nothing)
@@ -1002,13 +1093,16 @@ Implement comprehensive key binding system:
 **Document Formatting:**
 
 **Request:**
+
 - Send `textDocument/formatting` for whole document
 - Or `textDocument/rangeFormatting` for selection
 
 **Response:**
+
 - List of text edits to apply
 
 **Execution:**
+
 - Apply edits preserving cursor position where possible
 - Format on save (if configured)
 - Format on paste (if configured)
@@ -1017,10 +1111,12 @@ Implement comprehensive key binding system:
 **Inlay Hints:**
 
 **Request:**
+
 - Send `textDocument/inlayHint` with visible range
 - Update when viewport changes
 
 **Response:**
+
 - List of hints with:
   - Position in document
   - Label (text to display)
@@ -1029,6 +1125,7 @@ Implement comprehensive key binding system:
   - Padding before/after
 
 **Display:**
+
 - Render inline in editor in dimmed color
 - Parameter names: before arguments
 - Type hints: after variable declarations
@@ -1038,15 +1135,18 @@ Implement comprehensive key binding system:
 **Semantic Tokens:**
 
 **Request:**
+
 - Send `textDocument/semanticTokens/full` for initial tokens
 - Send `textDocument/semanticTokens/full/delta` for updates
 
 **Response:**
+
 - Encoded token data with positions, lengths, and types
 - Token types: namespace, type, class, enum, interface, struct, typeParameter, parameter, variable, property, enumMember, event, function, method, macro, keyword, modifier, comment, string, number, regexp, operator
 
 **Integration:**
-- Override or augment tree-sitter syntax highlighting
+
+- Override or augment typst syntax highlighting
 - More accurate coloring based on semantic analysis
 - Unused symbols dimmed
 - Deprecated symbols with strikethrough
@@ -1054,15 +1154,18 @@ Implement comprehensive key binding system:
 **Code Lens:**
 
 **Request:**
+
 - Send `textDocument/codeLens` for visible range
 
 **Response:**
+
 - List of code lenses with:
   - Range to display above
   - Command to execute on click
   - Title/label
 
 **Display:**
+
 - Clickable text above code elements
 - Examples: "5 references", "Run test", "Debug"
 - Execute command when clicked
@@ -1071,13 +1174,16 @@ Implement comprehensive key binding system:
 **Folding Ranges:**
 
 **Request:**
+
 - Send `textDocument/foldingRange`
 
 **Response:**
+
 - List of ranges that can be folded
 - Kind: comment, imports, region
 
 **Integration:**
+
 - Use to determine foldable sections
 - Combine with indentation-based folding
 - Show fold markers in gutter
@@ -1087,6 +1193,7 @@ Implement comprehensive key binding system:
 **Typst LSP Specific Settings:**
 
 **Compiler Settings:**
+
 - Root directory for project
 - Main entry file (if not auto-detected)
 - Font paths for custom fonts
@@ -1094,6 +1201,7 @@ Implement comprehensive key binding system:
 - Compilation mode (debug/release)
 
 **Editor Settings:**
+
 - Semantic highlighting enable/disable
 - Inlay hints configuration:
   - Show parameter names (always, never, on hover)
@@ -1102,16 +1210,19 @@ Implement comprehensive key binding system:
 - Format on save/type/paste
 
 **Diagnostic Settings:**
+
 - Diagnostic severity levels to show
 - Maximum number of diagnostics per file
 - Debounce delay for diagnostic updates
 
 **Performance Settings:**
+
 - Incremental compilation enable/disable
 - Cache size limits
 - Background indexing priority
 
 **Export Settings:**
+
 - PDF export options (passed to Typst)
 - PNG export resolution
 - SVG export settings
@@ -1129,6 +1240,7 @@ Implement comprehensive key binding system:
 **Connection Issues:**
 
 **Subprocess Failures:**
+
 - Detect if LSP process crashes or exits unexpectedly
 - Show notification to user: "Typst language server stopped"
 - Automatic restart with exponential backoff (1s, 2s, 4s, 8s, max 30s)
@@ -1136,6 +1248,7 @@ Implement comprehensive key binding system:
 - Button to manually restart LSP
 
 **Communication Errors:**
+
 - Malformed JSON: log error, ignore message, continue
 - Timeout: cancel request, show warning for user-initiated actions
 - Protocol errors: log, show notification with details
@@ -1143,10 +1256,12 @@ Implement comprehensive key binding system:
 **State Desynchronization:**
 
 **Detection:**
+
 - Track document versions sent vs. received in diagnostics
 - If mismatch detected, resynchronize
 
 **Recovery:**
+
 - Close all documents with `textDocument/didClose`
 - Reopen all documents with `textDocument/didOpen` (full content)
 - Re-send configuration
@@ -1155,10 +1270,12 @@ Implement comprehensive key binding system:
 **Performance Degradation:**
 
 **Monitoring:**
+
 - Track request latency (completion, hover, etc.)
 - Warn if LSP response times exceed thresholds (>1s for completion)
 
 **Mitigation:**
+
 - Increase debounce delays
 - Reduce frequency of background requests
 - Suggest user close large files or split workspace
@@ -1167,8 +1284,9 @@ Implement comprehensive key binding system:
 **Graceful Degradation:**
 
 If LSP unavailable:
+
 - Disable LSP-dependent features gracefully
-- Fall back to syntax highlighting only (tree-sitter)
+- Fall back to syntax highlighting only (typst-syntax)
 - Show message in status bar: "Language features unavailable"
 - Allow manual retry
 
@@ -1181,6 +1299,7 @@ If LSP unavailable:
 **Compiler Service Design:**
 
 **Compilation Request Flow:**
+
 ```
 Editor Change → Debouncer → Compilation Queue → Compiler Thread → Result Handler → Preview Update
                                ↓
@@ -1190,12 +1309,14 @@ Editor Change → Debouncer → Compilation Queue → Compiler Thread → Result
 **Compilation Modes:**
 
 1. **Incremental Compilation** (default):
+
    - Only recompile changed parts of document
    - Requires Typst's incremental compilation support
    - Fastest for small edits
    - Used during active editing
 
 2. **Full Compilation**:
+
    - Recompile entire document from scratch
    - Triggered on: file save, project settings change, dependencies update
    - Slower but ensures correctness
@@ -1233,6 +1354,7 @@ SystemWorld {
   - Network resources (images, data)
 
 **Priority:**
+
 1. In-memory buffer (if file is open in editor)
 2. Disk cache (if file was recently read)
 3. Fresh read from disk
@@ -1250,18 +1372,21 @@ SystemWorld {
 **Compilation Steps:**
 
 1. **Pre-compilation Validation**:
+
    - Check if main file exists and is readable
    - Validate project structure
    - Ensure fonts are available
    - Check package dependencies are downloaded
 
 2. **Source Preparation**:
+
    - Gather all source files (main + imports)
    - Create virtual file system with in-memory buffers
    - Resolve relative imports and paths
    - Set up font search paths
 
 3. **Typst Compilation**:
+
    - Create Typst `World` instance
    - Parse source files into syntax tree
    - Type checking and semantic analysis
@@ -1269,6 +1394,7 @@ SystemWorld {
    - Render to output format (PDF, SVG, PNG)
 
 4. **Post-compilation Processing**:
+
    - Extract diagnostics and warnings
    - Build source map (source positions → output positions)
    - Calculate page boundaries
@@ -1291,6 +1417,7 @@ SystemWorld {
 **Compilation Optimization:**
 
 **Caching Strategy:**
+
 - Cache parsed syntax trees for unchanged files
 - Cache font metrics and glyph data
 - Cache resolved imports and file hashes
@@ -1298,12 +1425,14 @@ SystemWorld {
 - Invalidate cache intelligently on changes
 
 **Incremental Recompilation:**
+
 - Detect minimal change set (which lines/paragraphs changed)
 - Reuse layout for unchanged sections
 - Only re-layout affected pages
 - Requires tracking dependencies between elements
 
 **Parallel Processing:**
+
 - Parse multiple imported files in parallel
 - Render independent pages in parallel (for multi-page documents)
 - Use thread pool sized to CPU cores
@@ -1312,17 +1441,20 @@ SystemWorld {
 **Debouncing and Throttling:**
 
 **Debouncing** (wait for pause in edits):
+
 - Start timer on first edit: 300ms default
 - Reset timer on each subsequent edit
 - Compile when timer expires
 - Configuration: adjustable delay (100ms-2s)
 
 **Throttling** (limit compilation frequency):
+
 - Maximum compilation rate: once per 100ms
 - Queue compilations if rate exceeded
 - Drop intermediate compilations if queue grows (keep only latest)
 
 **Adaptive Debouncing:**
+
 - Longer debounce for slow compilations (if last compile took >1s, wait 500ms)
 - Shorter debounce for fast compilations (if last compile took <100ms, wait 200ms)
 - Learn from compilation times and adjust
@@ -1332,6 +1464,7 @@ SystemWorld {
 **Rendering Backend Options:**
 
 **Option A: PDF Rendering (via pdfium)**:
+
 - **Pros**:
   - High fidelity to final output
   - Mature rendering engine
@@ -1342,6 +1475,7 @@ SystemWorld {
   - More memory usage
 
 **Option B: SVG Rendering**:
+
 - **Pros**:
   - Faster rendering for simple documents
   - Smooth zooming (vector graphics)
@@ -1352,6 +1486,7 @@ SystemWorld {
   - Browser SVG rendering limitations
 
 **Recommended: Hybrid Approach**:
+
 - Use SVG for real-time preview during editing
 - Switch to PDF for final review or on user request
 - Allow user to toggle between modes
@@ -1360,17 +1495,20 @@ SystemWorld {
 **Preview Rendering Pipeline:**
 
 1. **Document Reception**:
+
    - Receive compiled output from compilation service
    - Detect format (PDF, SVG, or both)
    - Calculate document dimensions and page count
 
 2. **Page Rendering**:
+
    - Render visible pages only (viewport culling)
    - Render adjacent pages for smooth scrolling (1-2 pages buffer)
    - Use texture caching for rendered pages
    - Discard offscreen page textures to save memory
 
 3. **Display Rendering**:
+
    - Composite pages with proper spacing
    - Apply zoom transformation
    - Render page shadows/borders
@@ -1384,6 +1522,7 @@ SystemWorld {
 **Zoom and Pan:**
 
 **Zoom Levels:**
+
 - Fit width: scale to fit page width in viewport
 - Fit page: scale to fit entire page in viewport
 - Fit height: scale to fit page height
@@ -1391,11 +1530,13 @@ SystemWorld {
 - Smooth zoom with Ctrl+wheel (continuous scaling)
 
 **Zoom Implementation:**
+
 - Re-render pages at new resolution when zoom changes significantly
 - Use GPU scaling for smooth intermediate zooms
 - Maintain sharp rendering at all zoom levels (render at target resolution)
 
 **Pan/Scroll:**
+
 - Smooth pixel-perfect scrolling
 - Momentum scrolling (inertial scrolling on trackpads)
 - Keyboard: Page Up/Down, Home/End, Arrow keys
@@ -1413,6 +1554,7 @@ SystemWorld {
 **Forward Sync (Source → Preview):**
 
 **Implementation:**
+
 - Use Typst's source mapping feature to get output positions
 - When user clicks in editor:
   - Get cursor position (line, column)
@@ -1422,6 +1564,7 @@ SystemWorld {
   - Highlight corresponding region in preview (with animated pulse)
 
 **Accuracy Considerations:**
+
 - Source position may map to multiple output positions (repeated content)
 - Show first occurrence or closest to current preview scroll position
 - Handle unmapped positions gracefully (show beginning of page/document)
@@ -1429,6 +1572,7 @@ SystemWorld {
 **Backward Sync (Preview → Source):**
 
 **Implementation:**
+
 - When user clicks in preview:
   - Get click coordinates (page, x, y)
   - Query compilation result for corresponding source position
@@ -1437,6 +1581,7 @@ SystemWorld {
   - Highlight corresponding line in editor (with animated pulse)
 
 **Source Mapping Data Structure:**
+
 ```
 SourceMapping {
     source_to_preview: HashMap<SourceSpan, Vec<PreviewLocation>>,
@@ -1474,36 +1619,42 @@ PreviewLocation {
 **Preview Toolbar:**
 
 **Zoom Controls:**
+
 - Zoom in/out buttons (+ -)
 - Zoom percentage dropdown with presets
 - Fit width / Fit page buttons
 - Reset zoom button (100%)
 
 **Page Navigation:**
+
 - Previous/next page buttons
 - Page number input: "Page X of Y"
 - Thumbnail navigation (show all pages as thumbnails)
 - Jump to page command (Ctrl+G)
 
 **View Options:**
+
 - Layout mode selector (single, continuous, two-up)
 - Rotate page (90° increments)
 - Night mode (invert colors)
 - Show/hide rulers and guides
 
 **Export:**
+
 - Export to PDF (save compiled output)
 - Export current page as PNG
 - Copy page as image
 - Print preview and print
 
 **Preview Settings:**
+
 - Rendering quality (draft, normal, high)
 - Background color
 - Page margins/spacing
 - Antialiasing settings
 
 **Status Bar:**
+
 - Current page / total pages
 - Zoom level
 - Compilation status (compiling, success, error)
@@ -1511,6 +1662,7 @@ PreviewLocation {
 - Document dimensions
 
 **Context Menu (Right-click):**
+
 - Copy text selection (if text selectable)
 - Copy as image
 - Save page as...
@@ -1524,12 +1676,14 @@ PreviewLocation {
 **Memory Management:**
 
 **Page Texture Caching:**
+
 - Cache rendered pages as GPU textures
 - LRU eviction: keep most recently viewed pages
 - Memory budget: configurable max cache size (default 200MB)
 - Discard cache when document recompiled (pages invalidated)
 
 **Lazy Loading:**
+
 - Load pages on-demand as user scrolls
 - Show placeholder while page rendering
 - Priority queue: visible pages highest priority
@@ -1538,21 +1692,25 @@ PreviewLocation {
 **Rendering Optimization:**
 
 **Viewport Culling:**
+
 - Only render pages intersecting viewport
 - Calculate visible page range efficiently
 - Update culled set on scroll/zoom
 
 **Level of Detail:**
+
 - Render lower quality when zoomed out significantly
 - Render high quality when zoomed in
 - Adaptive quality based on zoom level
 
 **Incremental Updates:**
+
 - When document recompiled, detect which pages changed
 - Only re-render changed pages
 - Reuse textures for unchanged pages
 
 **GPU Utilization:**
+
 - Offload rendering to GPU where possible
 - Use GPU for scaling and transformations
 - Batch render operations to reduce draw calls
@@ -1560,17 +1718,20 @@ PreviewLocation {
 **Compilation Performance:**
 
 **Smart Recompilation:**
+
 - Track edit locations and types
 - For trivial edits (typo fixes), use fast path
 - For structural changes (adding sections), use full path
 - Cancel in-flight compilation if new edit arrives
 
 **Background Compilation:**
+
 - Compile in background thread to keep UI responsive
 - Show progress indicator during compilation
 - Allow cancellation of long compilations
 
 **Compilation Timeouts:**
+
 - Set maximum compilation time (default: 30s)
 - If exceeded, show warning and allow user to:
   - Cancel and edit further
@@ -1586,6 +1747,7 @@ PreviewLocation {
 **Multi-Cursor Modes:**
 
 **Adding Cursors:**
+
 - Ctrl/Cmd+Click: add cursor at click position
 - Ctrl/Cmd+D: select next occurrence of word under cursor, add cursor
 - Ctrl/Cmd+Shift+L: add cursor to end of each selected line
@@ -1593,12 +1755,14 @@ PreviewLocation {
 - Ctrl/Cmd+Alt+Up/Down: add cursor above/below
 
 **Cursor Management:**
+
 - Track list of cursor positions (primary + secondaries)
 - Each cursor has independent selection
 - Cursors merge if they overlap after edit
 - Escape or click removes all secondary cursors
 
 **Editing with Multiple Cursors:**
+
 - Type: insert at all cursors simultaneously
 - Delete/Backspace: delete at all cursors
 - Paste: paste same content at all cursors (or split by lines if counts match)
@@ -1606,6 +1770,7 @@ PreviewLocation {
 - Home/End: move all cursors to line boundaries
 
 **Visual Representation:**
+
 - Primary cursor: solid color, blinking
 - Secondary cursors: same color, slightly transparent, blinking in sync
 - Each cursor's selection highlighted independently
@@ -1615,6 +1780,7 @@ PreviewLocation {
 **Search Panel:**
 
 **Basic Search:**
+
 - Search input field with incremental search
 - Results highlighted in editor as you type
 - Result counter: "3 of 15"
@@ -1623,18 +1789,21 @@ PreviewLocation {
 - Escape to close search
 
 **Search Options:**
+
 - Case sensitive toggle
 - Whole word match toggle
 - Regex mode toggle
 - Search in selection only toggle
 
 **Search Scope:**
+
 - Current file (default)
 - All open files
 - Entire workspace (uses LSP or ripgrep)
 - Specific folder
 
 **Visual Indicators:**
+
 - All matches highlighted in scrollbar
 - Current match highlighted differently (brighter)
 - Match count indicator
@@ -1643,18 +1812,21 @@ PreviewLocation {
 **Replace:**
 
 **Replace Panel:**
+
 - Replace input field
 - Replace button (replace current match)
 - Replace All button (replace all matches)
 - Replace in selection (if selection active)
 
 **Replace Preview:**
+
 - Show diff of changes before applying
 - Allow user to review and select which to replace
 - Checkbox list of all matches with context
 - Apply Selected button
 
 **Regex Replace:**
+
 - Capture groups: $1, $2, etc. in replacement
 - Case transformation: \u, \U, \l, \L
 - Conditional replacement based on capture groups
@@ -1662,12 +1834,14 @@ PreviewLocation {
 **Find in Files:**
 
 **Search Interface:**
+
 - Dedicated panel/tab for workspace search
 - Search query with same options as editor search
-- File pattern include/exclude (*.typ, !tests/)
+- File pattern include/exclude (\*.typ, !tests/)
 - Results tree grouped by file
 
 **Results Display:**
+
 - File path with match count
 - Each match with line number and context (1 line before/after)
 - Syntax highlighting in results
@@ -1679,6 +1853,7 @@ PreviewLocation {
 **Snippet System:**
 
 **Snippet Definition:**
+
 ```
 Snippet {
     trigger: String,              // Text to trigger snippet
@@ -1691,6 +1866,7 @@ Snippet {
 ```
 
 **Snippet Syntax:**
+
 - `$1`, `$2`, ...: Tab stops (cursor positions)
 - `${1:placeholder}`: Tab stop with default text
 - `${1|option1,option2|}`: Tab stop with choices
@@ -1703,12 +1879,14 @@ Snippet {
   - `$CLIPBOARD`: Clipboard content
 
 **Snippet Expansion:**
+
 - Trigger on Tab after typing snippet prefix
 - Show snippet completion suggestions
 - Preview snippet in completion popup
 - Insert snippet and enter snippet mode
 
 **Snippet Mode:**
+
 - Highlight current tab stop
 - Tab to move to next tab stop
 - Shift+Tab to move to previous
@@ -1717,6 +1895,7 @@ Snippet {
 - Enter on final tab stop ($0) exits mode
 
 **Built-in Snippets for Typst:**
+
 - Document template: `doc` → full document structure
 - Function definition: `func` → function with parameters
 - Heading levels: `h1`, `h2`, etc.
@@ -1729,6 +1908,7 @@ Snippet {
 - References: `ref`, `cite`
 
 **Custom Snippets:**
+
 - User-defined snippets in configuration file
 - JSON or YAML format
 - Global snippets vs. project-specific
@@ -1740,6 +1920,7 @@ Snippet {
 **Fold Types:**
 
 1. **Syntax-based folding**:
+
    - Function bodies
    - Block structures (#[...])
    - Conditional blocks (#if / #else)
@@ -1747,6 +1928,7 @@ Snippet {
    - Comments (block and adjacent line comments)
 
 2. **Indentation-based folding**:
+
    - Fallback when syntax unclear
    - Fold regions with consistent indentation
    - Useful for structured data
@@ -1759,12 +1941,14 @@ Snippet {
 **Folding UI:**
 
 **Gutter Indicators:**
+
 - Triangle icon in gutter next to foldable lines
 - ▼ when unfolded, ▶ when folded
 - Hover shows tooltip: "Fold X lines"
 - Click to toggle fold
 
 **Folded Display:**
+
 - Replace folded lines with single line
 - Show fold summary: `{...}` or `[... 15 lines]`
 - Different styling (italic, dimmed)
@@ -1772,12 +1956,14 @@ Snippet {
 - Click fold line to unfold
 
 **Keyboard Shortcuts:**
+
 - Ctrl/Cmd+K, Ctrl/Cmd+0: Fold all
 - Ctrl/Cmd+K, Ctrl/Cmd+J: Unfold all
 - Ctrl/Cmd+K, Ctrl/Cmd+L: Toggle fold at cursor
 - Ctrl/Cmd+K, Ctrl/Cmd+1-9: Fold level N
 
 **Fold Persistence:**
+
 - Remember fold states per file
 - Restore fold state when file reopened
 - Per-workspace fold state storage
@@ -1795,6 +1981,7 @@ Snippet {
 **Pane Management:**
 
 **Split Operations:**
+
 - Split horizontal: Divide editor vertically (side-by-side)
 - Split vertical: Divide editor horizontally (top/bottom)
 - Split with same file: Two views of same document (synchronized scrolling option)
@@ -1802,6 +1989,7 @@ Snippet {
 - Maximum splits: 4 panes recommended (configurable)
 
 **Pane Layout:**
+
 ```
 Workspace {
     root_pane: PaneGroup,
@@ -1821,6 +2009,7 @@ Pane {
 ```
 
 **Pane Navigation:**
+
 - Click to focus pane
 - Keyboard: Ctrl+1-9 to focus pane by number
 - Cycle: Ctrl+Tab to next pane, Ctrl+Shift+Tab to previous
@@ -1828,12 +2017,14 @@ Pane {
 - Swap panes: Drag pane tab to another pane
 
 **Splitter Controls:**
+
 - Draggable splitter between panes
 - Double-click splitter to equalize sizes
 - Keyboard: Ctrl+Alt+= to equalize all, Ctrl+Alt++ to grow, Ctrl+Alt+- to shrink
 - Minimum pane size: 200px width, 100px height
 
 **Pane Options:**
+
 - Maximize pane (hide others temporarily)
 - Close pane (merge with sibling)
 - New pane (create editor in new split)
@@ -1841,6 +2032,7 @@ Pane {
 - Swap pane positions
 
 **Layout Presets:**
+
 - 50/50 vertical split (editor | preview)
 - 70/30 vertical split (large editor | narrow preview)
 - Horizontal split (editor top | preview bottom)
@@ -1852,6 +2044,7 @@ Pane {
 **File Explorer Sidebar:**
 
 **Tree View:**
+
 - Show project directory tree
 - File and folder icons (by type)
 - Expand/collapse folders
@@ -1860,6 +2053,7 @@ Pane {
 - Search/filter files in tree
 
 **File Operations:**
+
 - New file/folder
 - Rename (F2)
 - Delete (Delete key, with confirmation)
@@ -1869,6 +2063,7 @@ Pane {
 - Show in system file manager
 
 **Context Menu:**
+
 - Open file
 - Open in new window
 - Open with default app
@@ -1880,6 +2075,7 @@ Pane {
 - Rename
 
 **File Status Indicators:**
+
 - Modified (dot or star)
 - Read-only (lock icon)
 - Git status (M, A, D, U indicators)
@@ -1888,6 +2084,7 @@ Pane {
 **Quick Open:**
 
 **File Picker (Ctrl/Cmd+P):**
+
 - Fuzzy search across all project files
 - Show recent files first
 - Show file path and preview
@@ -1896,11 +2093,13 @@ Pane {
 - Search as you type with instant results
 
 **Recent Files:**
+
 - List of recently opened files
 - Pinned files stay at top
 - Clear recent history option
 
 **Go to Symbol (Ctrl/Cmd+T):**
+
 - Search for symbols across workspace
 - Fuzzy match on symbol name
 - Show file and line number
@@ -1909,12 +2108,14 @@ Pane {
 **Breadcrumbs:**
 
 **Path Breadcrumbs:**
+
 - Show file path at top of editor
 - Each segment clickable (shows siblings)
 - Show current folder structure
 - Navigate up folder hierarchy
 
 **Symbol Breadcrumbs:**
+
 - Show current symbol hierarchy
 - Function → nested function → current position
 - Click to jump to parent symbol
@@ -1929,6 +2130,7 @@ Pane {
 **Profiling Tools:**
 
 **Built-in Profilers:**
+
 - Frame time profiler: Track time per frame (target: <16ms for 60fps)
 - Render pipeline profiler: Break down render stages
 - Memory profiler: Track allocations, heap usage, leaks
@@ -1936,6 +2138,7 @@ Pane {
 - Compilation profiler: Time each compilation stage
 
 **Performance Metrics Dashboard:**
+
 - Real-time FPS counter
 - Memory usage graph
 - CPU usage by thread
@@ -1945,6 +2148,7 @@ Pane {
 - Cache hit rates
 
 **Profiling Workflow:**
+
 1. Enable profiling mode via dev menu
 2. Perform actions to profile (editing, scrolling, etc.)
 3. Export profiling data to JSON
@@ -1953,24 +2157,28 @@ Pane {
 **Critical Optimization Targets:**
 
 **Text Rendering:**
+
 - Target: <5ms to render visible text
 - Optimize: Glyph caching, shaped text reuse
 - Lazy shape: Only shape visible lines
 - GPU upload: Batch glyph texture updates
 
 **Scrolling:**
+
 - Target: Locked 60fps during scroll
 - Optimize: Virtual scrolling, render ahead
 - Throttle: LSP updates during rapid scroll
 - Cache: Rendered line textures
 
 **Typing Latency:**
+
 - Target: <50ms from keystroke to screen update
 - Optimize: Fast path for character insertion
 - Defer: Syntax highlighting, LSP notifications
 - Prioritize: Cursor movement and character display
 
 **Compilation:**
+
 - Target: <500ms for typical document changes
 - Optimize: Incremental compilation, caching
 - Cancel: Abandon old compilations quickly
@@ -1981,6 +2189,7 @@ Pane {
 **Memory Budget Allocation:**
 
 Total target: <500MB for typical session
+
 - Text buffers: 50MB (including undo history)
 - Rendered line cache: 100MB
 - LSP data structures: 50MB
@@ -1991,24 +2200,28 @@ Total target: <500MB for typical session
 **Memory Reduction Strategies:**
 
 **Text Buffer:**
+
 - Use rope structure (minimal memory overhead)
 - Compact undo history (merge consecutive edits)
 - Discard old undo entries beyond limit
 - Share immutable text between snapshots
 
 **Render Cache:**
+
 - LRU eviction for offscreen lines
 - Compress cached textures when inactive
 - Discard invisible line renders
 - Reference counting for shared glyphs
 
 **Preview:**
+
 - Render only visible pages + buffer
 - Use mipmap levels for zoomed-out views
 - Compress page textures (GPU compression)
 - Stream large PDFs page-by-page
 
 **LSP Data:**
+
 - Incremental symbol tables (not full copies)
 - Weak references to rarely used data
 - Periodic garbage collection of stale data
@@ -2017,18 +2230,21 @@ Total target: <500MB for typical session
 **Memory Leak Prevention:**
 
 **Leak Detection:**
+
 - Track allocations in development builds
 - Periodic heap snapshots
 - Compare snapshots to find leaks
 - Automated leak tests in CI
 
 **Common Leak Sources:**
+
 - Circular references (use weak pointers)
 - Event handlers not unsubscribed
 - Cached data never evicted
 - GPU resources not freed
 
 **Mitigation:**
+
 - RAII patterns (Rust ownership helps)
 - Explicit cleanup in Drop implementations
 - Validation: All resources freed on close
@@ -2037,6 +2253,7 @@ Total target: <500MB for typical session
 ### 7.3 Startup Time Optimization
 
 **Startup Performance Targets:**
+
 - Cold start: <2 seconds to window display
 - Warm start: <1 second to usable editor
 - Resume session: <500ms to restored state
@@ -2044,6 +2261,7 @@ Total target: <500MB for typical session
 **Startup Phases:**
 
 **Phase 1: Application Launch (0-200ms):**
+
 - Binary loading (OS responsibility)
 - Initialize logging system
 - Parse command line arguments
@@ -2051,6 +2269,7 @@ Total target: <500MB for typical session
 - Initialize GPUI runtime
 
 **Phase 2: Window Creation (200-500ms):**
+
 - Create main application window
 - Initialize GPU context
 - Load theme (cached if possible)
@@ -2058,6 +2277,7 @@ Total target: <500MB for typical session
 - Begin async initialization
 
 **Phase 3: Workspace Restoration (500-1500ms):**
+
 - Load workspace state from disk
 - Restore open files (lazy load content)
 - Restore split pane layout
@@ -2065,6 +2285,7 @@ Total target: <500MB for typical session
 - Show editor as soon as first file loaded
 
 **Phase 4: Full Initialization (1500-2000ms):**
+
 - Complete LSP initialization
 - Index project files (in background)
 - Load plugins/extensions
@@ -2082,6 +2303,7 @@ Total target: <500MB for typical session
 **Session Restoration:**
 
 **State to Restore:**
+
 - Open files and dirty buffers
 - Cursor positions and selections
 - Scroll positions in each editor
@@ -2091,6 +2313,7 @@ Total target: <500MB for typical session
 - Undo history (optional, can be large)
 
 **Fast Restoration:**
+
 - Store session state in binary format (not JSON)
 - Incremental writes during session
 - Read only what's needed for display
@@ -2102,6 +2325,7 @@ Total target: <500MB for typical session
 **Visual Refinements:**
 
 **Animations:**
+
 - Smooth cursor movement (ease-out)
 - Smooth scrolling (momentum and easing)
 - Fade in/out for tooltips and popups
@@ -2110,12 +2334,14 @@ Total target: <500MB for typical session
 - Loading spinners for async operations
 
 **Timing:**
+
 - All animations <300ms duration
 - No animation blocking user input
 - Instant feedback for all interactions
 - Cancellable animations (new action stops old)
 
 **Transitions:**
+
 - Theme changes: smooth color transitions
 - Pane resizing: smooth size adjustments
 - Tab switching: slide or fade effect
@@ -2124,6 +2350,7 @@ Total target: <500MB for typical session
 **Visual Feedback:**
 
 **Interactive States:**
+
 - Hover: Highlight buttons, links, gutter items
 - Active: Darken/lighten pressed buttons
 - Focus: Border or background change for focused elements
@@ -2131,12 +2358,14 @@ Total target: <500MB for typical session
 - Loading: Spinner or progress indicator
 
 **Progress Indication:**
+
 - Compilation: Progress bar in status bar
 - File operations: Modal progress dialog for slow ops
 - Background tasks: Unobtrusive indicator in corner
 - Cancellable: Show cancel button for long operations
 
 **Error States:**
+
 - Validation errors: Red border, inline message
 - Missing files: Yellow background, warning icon
 - LSP disconnected: Status bar indicator
@@ -2145,6 +2374,7 @@ Total target: <500MB for typical session
 **Accessibility:**
 
 **Keyboard Navigation:**
+
 - Full keyboard control (no mouse required)
 - Tab navigation through all UI elements
 - Escape to close popups/dialogs
@@ -2152,6 +2382,7 @@ Total target: <500MB for typical session
 - Customizable keyboard shortcuts
 
 **Screen Reader Support:**
+
 - ARIA labels for all UI elements
 - Announce editor changes to screen readers
 - Describe cursor position and selections
@@ -2159,6 +2390,7 @@ Total target: <500MB for typical session
 - Announce compilation status
 
 **Visual Accessibility:**
+
 - High contrast mode
 - Adjustable font sizes (UI and editor separate)
 - Colorblind-friendly themes
@@ -2166,6 +2398,7 @@ Total target: <500MB for typical session
 - Line height adjustable
 
 **Motor Accessibility:**
+
 - Click target sizes: minimum 32x32 pixels
 - Drag distance threshold configurable
 - Double-click timing adjustable
@@ -2173,6 +2406,7 @@ Total target: <500MB for typical session
 - Mouse keys support
 
 **Sound Feedback (Optional):**
+
 - Audible bell for errors
 - Sound on compilation complete
 - Mute option for all sounds
@@ -2235,6 +2469,7 @@ Theme {
 ```
 
 **Built-in Themes:**
+
 - Light: Bright background, dark text (default light)
 - Dark: Dark background, light text (default dark)
 - High Contrast Light: Maximum contrast for accessibility
@@ -2244,18 +2479,21 @@ Theme {
 **Theme Customization:**
 
 **User Overrides:**
+
 - Override specific colors without full theme
 - Per-workspace theme overrides
 - Time-based theme switching (auto dark mode at night)
 - Sync with system theme preference
 
 **Theme Editor:**
+
 - Visual theme editor (future enhancement)
 - Live preview while editing
 - Export theme to file for sharing
 - Import themes from file or URL
 
 **Theme Migration:**
+
 - Detect theme format changes
 - Migrate old theme files to new format
 - Warn if theme missing required colors
@@ -2276,6 +2514,7 @@ Each level overrides previous, allowing granular control.
 **Configuration Format:**
 
 Use TOML for human readability:
+
 ```toml
 [editor]
 font_family = "JetBrains Mono"
@@ -2328,6 +2567,7 @@ max_compile_time = 30000
 **Configuration UI:**
 
 **Settings Panel:**
+
 - Categorized settings tree
 - Search settings by name/description
 - Show current value and default
@@ -2341,6 +2581,7 @@ max_compile_time = 30000
 - Show which config level sets each value
 
 **Hot Reload:**
+
 - Watch config files for changes
 - Reload and apply changes immediately
 - No restart required for most settings
@@ -2352,12 +2593,14 @@ max_compile_time = 30000
 **Error Categories:**
 
 1. **User Errors** (expected, common):
+
    - File not found
    - Syntax errors in Typst code
    - Invalid configuration
    - File permission issues
 
 2. **Application Errors** (unexpected, need graceful handling):
+
    - LSP crash or disconnect
    - Compilation timeout or failure
    - Out of memory
@@ -2372,18 +2615,21 @@ max_compile_time = 30000
 **Error Presentation:**
 
 **User Error Display:**
+
 - Inline in editor (squiggly underlines)
 - Diagnostic panel with full details
 - Toast notification for file operations
 - Modal dialog only when blocking action needed
 
 **Application Error Display:**
+
 - Status bar indicator (yellow/red)
 - Detailed error in panel (expandable)
 - Offer recovery actions when possible
 - Log to file for debugging
 
 **Critical Error Display:**
+
 - Modal dialog explaining issue
 - Options: Restart, Safe Mode, Report Issue
 - Attempt to save unsaved work
@@ -2392,12 +2638,14 @@ max_compile_time = 30000
 **Error Recovery:**
 
 **Automatic Recovery:**
+
 - Restart crashed LSP automatically
 - Retry failed file operations (with backoff)
 - Reload corrupted cache from backup
 - Rebuild indexes if corrupted
 
 **User-Initiated Recovery:**
+
 - "Retry" button for failed operations
 - "Reset to defaults" for config errors
 - "Safe mode" startup bypasses extensions
@@ -2406,6 +2654,7 @@ max_compile_time = 30000
 **Error Reporting:**
 
 **Crash Reports:**
+
 - Collect crash information (stack trace, logs)
 - Ask user permission to send report
 - Include system info (OS, version, etc.)
@@ -2413,6 +2662,7 @@ max_compile_time = 30000
 - Send to telemetry endpoint (opt-in)
 
 **Bug Report Template:**
+
 - Pre-filled with version, OS, error details
 - Link to open issue in GitHub
 - Attach relevant logs
@@ -2423,6 +2673,7 @@ max_compile_time = 30000
 **Unit Tests:**
 
 **Core Components:**
+
 - Text buffer operations (insert, delete, undo)
 - Bidirectional text algorithm
 - Cursor movement logic
@@ -2435,6 +2686,7 @@ max_compile_time = 30000
 **Integration Tests:**
 
 **Editor Workflows:**
+
 - Open file, edit, save, close
 - Multi-cursor editing sequences
 - Search and replace operations
@@ -2443,6 +2695,7 @@ max_compile_time = 30000
 - Compilation pipeline end-to-end
 
 **Test Approach:**
+
 - Simulated user input
 - Verify state after operations
 - Check UI updates (via GPUI test utilities)
@@ -2451,12 +2704,14 @@ max_compile_time = 30000
 **UI Tests:**
 
 **Component Tests:**
+
 - Render components in test environment
 - Verify layout calculations
 - Check event handling
 - Validate accessibility properties
 
 **Visual Regression Tests:**
+
 - Capture screenshots of UI components
 - Compare against baseline images
 - Detect unintended visual changes
@@ -2465,6 +2720,7 @@ max_compile_time = 30000
 **Performance Tests:**
 
 **Benchmarks:**
+
 - Buffer operations (insert, delete) on large files
 - Syntax highlighting speed
 - Compilation time for various document sizes
@@ -2472,6 +2728,7 @@ max_compile_time = 30000
 - Scrolling frame rate
 
 **Continuous Monitoring:**
+
 - Track performance over commits
 - Alert if performance regresses >10%
 - Benchmark suite in CI
@@ -2480,12 +2737,14 @@ max_compile_time = 30000
 **Platform Tests:**
 
 **Cross-Platform Validation:**
+
 - Automated tests on macOS, Linux, Windows
 - Test platform-specific code paths
 - Verify keyboard shortcuts work on all platforms
 - Check font rendering consistency
 
 **Manual Testing Checklist:**
+
 - Hardware acceleration (dedicated GPU)
 - HiDPI display support
 - Dark mode appearance
@@ -2495,6 +2754,7 @@ max_compile_time = 30000
 **Typst-Specific Tests:**
 
 **Document Tests:**
+
 - Sample Typst documents of varying complexity
 - Multilingual documents (RTL, LTR, CJK)
 - Large documents (>10,000 lines)
@@ -2502,6 +2762,7 @@ max_compile_time = 30000
 - Documents with complex math
 
 **Edge Cases:**
+
 - Empty document
 - Very long lines (>10,000 characters)
 - Deeply nested structures
@@ -2513,6 +2774,7 @@ max_compile_time = 30000
 **User Documentation:**
 
 **Getting Started Guide:**
+
 - Installation instructions per platform
 - First-time setup wizard walkthrough
 - Creating first Typst document
@@ -2520,6 +2782,7 @@ max_compile_time = 30000
 - Preview and export tutorial
 
 **User Manual:**
+
 - Complete feature documentation
 - Keyboard shortcuts reference
 - Configuration reference
@@ -2527,6 +2790,7 @@ max_compile_time = 30000
 - FAQ
 
 **Video Tutorials:**
+
 - Editor overview (5 minutes)
 - Advanced editing features (10 minutes)
 - Working with bidirectional text (5 minutes)
@@ -2535,17 +2799,20 @@ max_compile_time = 30000
 **Developer Documentation:**
 
 **Architecture Overview:**
+
 - System design document
 - Component interaction diagrams
 - Threading model explanation
 - State management approach
 
 **API Documentation:**
+
 - Rustdoc for all public APIs
 - Code examples for key components
 - Extension/plugin API (if applicable)
 
 **Contribution Guide:**
+
 - Setting up development environment
 - Building and running tests
 - Code style guidelines
@@ -2553,6 +2820,7 @@ max_compile_time = 30000
 - Issue reporting guidelines
 
 **LSP Integration Guide:**
+
 - How to debug LSP issues
 - LSP message logging
 - Custom LSP settings
@@ -2565,6 +2833,7 @@ max_compile_time = 30000
 ### 8.1 Alpha Release (Week 21)
 
 **Alpha Features:**
+
 - Core editing with bidirectional text
 - Basic Typst compilation
 - Simple preview
@@ -2572,12 +2841,14 @@ max_compile_time = 30000
 - Minimal UI polish
 
 **Alpha Goals:**
+
 - Internal testing
 - Gather early feedback on architecture
 - Identify critical bugs
 - Performance baseline
 
 **Alpha Distribution:**
+
 - GitHub releases page
 - Pre-compiled binaries for major platforms
 - Build-from-source instructions
@@ -2586,6 +2857,7 @@ max_compile_time = 30000
 ### 8.2 Beta Release (Week 24)
 
 **Beta Features:**
+
 - All planned features implemented
 - LSP fully integrated
 - Preview with source sync
@@ -2594,6 +2866,7 @@ max_compile_time = 30000
 - Theme support
 
 **Beta Goals:**
+
 - Public testing by early adopters
 - Real-world usage feedback
 - Bug fixing and stabilization
@@ -2601,6 +2874,7 @@ max_compile_time = 30000
 - Documentation completion
 
 **Beta Distribution:**
+
 - Public announcement (Reddit, HN, forums)
 - Auto-update mechanism (optional)
 - Feedback channels (Discord, GitHub Discussions)
@@ -2609,6 +2883,7 @@ max_compile_time = 30000
 ### 8.3 Release Candidate (Week 26)
 
 **RC Criteria:**
+
 - No known critical bugs
 - Performance targets met
 - Documentation complete
@@ -2616,6 +2891,7 @@ max_compile_time = 30000
 - Security audit passed
 
 **RC Testing:**
+
 - Extended testing period (2 weeks)
 - Bug bounty program
 - Stress testing
@@ -2625,6 +2901,7 @@ max_compile_time = 30000
 ### 8.4 Version 1.0 Release (Week 28)
 
 **Release Readiness:**
+
 - All RC issues resolved
 - Release notes finalized
 - Marketing materials prepared
@@ -2632,6 +2909,7 @@ max_compile_time = 30000
 - Telemetry and crash reporting operational
 
 **Launch Activities:**
+
 - Press release / blog post
 - Social media announcement
 - Product Hunt / HN launch
@@ -2639,6 +2917,7 @@ max_compile_time = 30000
 - Monitor for launch day issues
 
 **Post-Launch:**
+
 - Hotfix readiness (24/7 on-call first week)
 - User feedback monitoring
 - Rapid bug fixes for critical issues
@@ -2647,6 +2926,7 @@ max_compile_time = 30000
 ### 8.5 Continuous Delivery
 
 **Release Cadence:**
+
 - Major versions: Every 6 months (new features)
 - Minor versions: Monthly (enhancements, non-breaking changes)
 - Patch versions: As needed (bug fixes, security)
@@ -2654,6 +2934,7 @@ max_compile_time = 30000
 **Update Mechanism:**
 
 **Auto-Update:**
+
 - Check for updates on startup (daily)
 - Download in background
 - Notify user when ready
@@ -2661,6 +2942,7 @@ max_compile_time = 30000
 - Rollback option if issues
 
 **Update Channels:**
+
 - Stable: Tested releases only
 - Beta: Early access to new features
 - Nightly: Latest development builds
@@ -2685,6 +2967,7 @@ max_compile_time = 30000
 **GPUI Framework Details:**
 
 GPUI is Zed's UI framework, designed for performance:
+
 - GPU-accelerated rendering
 - Reactive state management
 - Platform abstractions (macOS, Linux, Windows)
@@ -2692,6 +2975,7 @@ GPUI is Zed's UI framework, designed for performance:
 - Accessibility built-in
 
 **Integration Considerations:**
+
 - Use GPUI's text rendering for consistency
 - Leverage reactive components for UI updates
 - Platform-specific code via GPUI abstractions
@@ -2700,6 +2984,7 @@ GPUI is Zed's UI framework, designed for performance:
 **Bidirectional Text Algorithm (UAX #9):**
 
 Unicode Standard Annex #9 defines the algorithm:
+
 1. **Explicit embeddings**: Process RLE, LRE, RLO, LRO, PDF, RLI, LRI, FSI, PDI
 2. **Resolve weak types**: Numbers, European number separators, etc.
 3. **Resolve neutral types**: Spaces, punctuation based on context
@@ -2712,6 +2997,7 @@ Unicode Standard Annex #9 defines the algorithm:
 **Typst Compiler Integration:**
 
 Typst provides:
+
 - `typst` crate: Core compiler
 - `typst-syntax`: Parser and syntax tree
 - `typst-library`: Standard library
@@ -2720,6 +3006,7 @@ Typst provides:
 
 **World Trait:**
 Must implement `typst::World`:
+
 - `library()`: Provide standard library
 - `book()`: Provide font catalog
 - `main()`: Provide main source file
@@ -2796,23 +3083,27 @@ Must implement `typst::World`:
 **WCAG 2.1 Level AA Compliance:**
 
 **Perceivable:**
+
 - Color contrast: 4.5:1 for normal text, 3:1 for large
 - Zoom: UI scales to 200% without loss of functionality
 - Keyboard navigation: All features accessible via keyboard
 - Screen reader: ARIA labels and announcements
 
 **Operable:**
+
 - Keyboard shortcuts: No timing requirements
 - Focus visible: Clear focus indicators
 - Skip navigation: Jump to main content
 - Motion: Disable animations option
 
 **Understandable:**
+
 - Language: Consistent terminology
 - Error messages: Clear and actionable
 - Help: Context-sensitive help available
 
 **Robust:**
+
 - Standards: Use semantic HTML/accessibility APIs
 - Compatibility: Test with multiple screen readers
 
@@ -2828,6 +3119,7 @@ Must implement `typst::World`:
 **Translation (l10n):**
 
 **Priority Languages:**
+
 1. English (default, US and UK)
 2. Spanish
 3. French
@@ -2838,12 +3130,14 @@ Must implement `typst::World`:
 8. Russian
 
 **Translation Infrastructure:**
+
 - Use `fluent` crate for translations
 - Translation files in FTL format
 - Crowdsourced translations (Crowdin, POEditor)
 - Regular translation updates
 
 **RTL Language Support:**
+
 - UI mirrors for RTL languages
 - Text direction auto-detection
 - Mixed directionality in UI
@@ -2863,6 +3157,7 @@ This specification provides a comprehensive roadmap for building a sophisticated
 6. **Documentation**: Help users and developers understand the system
 
 **Next Steps:**
+
 1. Review and refine specification
 2. Set up development environment
 3. Begin Phase 1 implementation
@@ -2870,6 +3165,7 @@ This specification provides a comprehensive roadmap for building a sophisticated
 5. Build and maintain momentum
 
 **Success Metrics:**
+
 - Editor startup time <2s
 - Keystroke latency <50ms
 - Compilation time <500ms for typical edits
