@@ -2,10 +2,10 @@
 name = "typst-editor"
 version = "0.1.0"
 edition = "2021"
-authors = ["Typst Editor Contributors"]
+authors = ["Hillel Nagid"]
 description = "A native cross-platform editor for Typst with bidirectional text support"
 license = "MIT OR Apache-2.0"
-repository = "https://github.com/yourusername/typst-editor"
+repository = "https://github.com/Hillel-Nagid/typst-editor"
 
 [workspace]
 members = ["crates/*"]
@@ -23,9 +23,9 @@ ui-components = { path = "crates/ui-components" }
 # GPUI framework
 gpui = "0.2.1"
 
-# Typst
-typst = "0.12"
-typst-syntax = "0.13.1"
+# Typst - Optional feature since not used in main app yet
+typst = { version = "0.12", optional = true }
+typst-syntax = { version = "0.13.1", optional = true }
 
 # Text processing
 ropey = "1.6"
@@ -33,16 +33,26 @@ unicode-bidi = "0.3"
 unicode-segmentation = "1.11"
 
 # Async runtime
-tokio = { version = "1.35", features = ["full"] }
+tokio = { version = "1.35", features = [
+    "rt-multi-thread",
+    "net",
+    "fs",
+    "io-util",
+    "time",
+    "macros",
+] }
 
-# File watching
-notify = "6.0"
+# File watching - minimal features for now
+notify = { version = "6.0", features = ["default"] }
 
-# PDF rendering
-pdfium-render = "0.8"
+# PDF rendering - optional for Phase 2
+# pdfium-render = "0.8"  # Disabled until actually used in preview
 
 # Serialization
-serde = { version = "1.0", features = ["derive"] }
+serde = { version = "1.0", default-features = false, features = [
+    "derive",
+    "std",
+] }
 serde_json = "1.0"
 toml = "0.8"
 
@@ -53,6 +63,10 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 # Error handling
 thiserror = "1.0"
 anyhow = "1.0"
+
+[features]
+default = []
+full-typst = ["typst", "typst-syntax"]
 
 [dev-dependencies]
 # Testing
@@ -74,3 +88,7 @@ opt-level = 0
 
 [profile.test]
 opt-level = 0
+
+[profile.rust-analyzer]
+inherits = "dev"
+panic = 'unwind'

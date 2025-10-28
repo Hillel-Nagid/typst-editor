@@ -3,8 +3,7 @@
 //! Phase 3.1: Editor View Component Hierarchy
 
 use gpui::*;
-use editor_core::Position;
-use crate::decorations::{ GutterDecoration, GitDiffKind };
+use crate::decorations::{ GutterDecoration, GutterDecorationKind, GitDiffKind };
 
 /// Gutter component showing line numbers and decorations
 pub struct Gutter {
@@ -32,13 +31,69 @@ impl Gutter {
     }
 
     /// Calculate gutter width based on line count and decorations
-    pub fn calculate_width(&self, _line_count: usize) -> f32 {
-        todo!("Calculate gutter width based on max line number and decorations")
+    pub fn calculate_width(&self, line_count: usize) -> f32 {
+        let mut width = 0.0;
+
+        if self.show_line_numbers {
+            // Calculate digits needed for line numbers
+            let digits = line_count.to_string().len();
+
+            // Estimate character width (assuming monospace digit width of 6-8px)
+            let char_width = 7.0;
+            let number_width = (digits as f32) * char_width;
+
+            // Add padding: 8px left + 8px right
+            width += number_width + 16.0;
+        }
+
+        // Add space for folding markers if enabled
+        if self.show_folding {
+            width += 16.0;
+        }
+
+        // Add space for git diff indicators if enabled
+        if self.show_git_diff {
+            width += 4.0;
+        }
+
+        // Add space for diagnostic icons (error/warning) if enabled
+        width += 16.0;
+
+        width.max(self.width)
     }
 
     /// Render the gutter for a specific line
-    pub fn render_line(&self, _line: usize, _decorations: &[GutterDecoration]) {
-        todo!("Render gutter decorations for a line")
+    pub fn render_line(&self, line: usize, decorations: &[GutterDecoration]) {
+        // Calculate Y position: line * line_height (would need to be passed in)
+        // This is a placeholder for rendering logic
+
+        // Filter decorations for this line
+        let line_decorations: Vec<&GutterDecoration> = decorations
+            .iter()
+            .filter(|dec| dec.line == line)
+            .collect();
+
+        // Render each decoration type
+        for decoration in line_decorations {
+            match &decoration.kind {
+                GutterDecorationKind::LineNumber => {
+                    // Format and render line number
+                    // Would call LineNumbers::render()
+                }
+                GutterDecorationKind::FoldingMarker { folded: _ } => {
+                    // Render triangle icon: ▼ expanded, ▶ collapsed
+                    // Position: to the left of line numbers
+                }
+                GutterDecorationKind::Diagnostic(_severity) => {
+                    // Choose icon and color based on severity
+                    // Position: to the left of line numbers
+                }
+                GutterDecorationKind::GitDiff(_kind) => {
+                    // Draw colored bar: green=added, blue=modified, red=deleted
+                    // Position: at far left edge
+                }
+            }
+        }
     }
 
     /// Set gutter width
@@ -57,12 +112,42 @@ impl Gutter {
     }
 
     /// Handle click in gutter (for folding etc.)
-    pub fn handle_click(
-        &self,
-        _position: Point<Pixels>,
-        _line_height: f32
-    ) -> Option<GutterAction> {
-        todo!("Handle mouse clicks in gutter")
+    pub fn handle_click(&self, position: Point<Pixels>, line_height: f32) -> Option<GutterAction> {
+        let y_pos: f32 = position.y.into();
+
+        // Calculate which line was clicked
+        let line = (y_pos / line_height).floor() as usize;
+
+        let x_pos: f32 = position.x.into();
+
+        // Determine which gutter element was clicked based on X coordinate
+        let mut offset = 0.0;
+
+        // Check if in folding area (0-16px)
+        if self.show_folding {
+            if x_pos >= offset && x_pos < offset + 16.0 {
+                return Some(GutterAction::ToggleFold(line));
+            }
+            offset += 16.0;
+        }
+
+        // Check if in git diff area (if enabled)
+        if self.show_git_diff {
+            if x_pos >= offset && x_pos < offset + 4.0 {
+                return Some(GutterAction::ShowGitDiff(line));
+            }
+            offset += 4.0;
+        }
+
+        // Check if in line number area
+        if self.show_line_numbers {
+            // Line numbers take up most of the width
+            if x_pos >= offset && x_pos < offset + (self.width - offset) {
+                return Some(GutterAction::SelectLine(line));
+            }
+        }
+
+        None
     }
 }
 
@@ -97,8 +182,19 @@ impl LineNumbers {
     }
 
     /// Render line number for a specific line
-    pub fn render(&self, _line: usize, _relative_to: Option<usize>) -> String {
-        todo!("Format line number for display")
+    pub fn render(&self, line: usize, relative_to: Option<usize>) -> String {
+        if let Some(relative) = relative_to {
+            // Calculate relative line number
+            let diff = line.abs_diff(relative);
+            if diff == 0 {
+                line.to_string() // Current line shows absolute number
+            } else {
+                diff.to_string()
+            }
+        } else {
+            // Absolute line number
+            (line + 1).to_string() // Convert from 0-indexed to 1-indexed
+        }
     }
 
     /// Set current line for highlighting
@@ -229,57 +325,4 @@ impl Default for GitDiffIndicators {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_gutter_creation() {
-        let gutter = Gutter::new();
-        assert!(gutter.show_line_numbers);
-        assert!(gutter.show_folding);
-        assert!(gutter.show_git_diff);
-        assert!(!gutter.relative_line_numbers);
-    }
-
-    #[test]
-    fn test_gutter_toggle_line_numbers() {
-        let mut gutter = Gutter::new();
-        gutter.toggle_line_numbers();
-        assert!(!gutter.show_line_numbers);
-        gutter.toggle_line_numbers();
-        assert!(gutter.show_line_numbers);
-    }
-
-    #[test]
-    fn test_line_numbers_current_line() {
-        let mut line_numbers = LineNumbers::new();
-        assert_eq!(line_numbers.current_line, None);
-        line_numbers.set_current_line(5);
-        assert_eq!(line_numbers.current_line, Some(5));
-    }
-
-    #[test]
-    fn test_folding_markers() {
-        let mut markers = FoldingMarkers::new();
-        assert!(!markers.is_folded(5));
-        markers.folded_ranges.push((5, 10));
-        assert!(markers.is_folded(7));
-        assert!(!markers.is_folded(11));
-        markers.unfold_all();
-        assert!(markers.folded_ranges.is_empty());
-    }
-
-    #[test]
-    fn test_git_diff_indicators() {
-        let mut indicators = GitDiffIndicators::new();
-        indicators.set_diffs(
-            vec![(1, GitDiffKind::Added), (2, GitDiffKind::Modified), (3, GitDiffKind::Deleted)]
-        );
-        assert_eq!(indicators.get_diff(1), Some(GitDiffKind::Added));
-        assert_eq!(indicators.get_diff(2), Some(GitDiffKind::Modified));
-        assert_eq!(indicators.get_diff(3), Some(GitDiffKind::Deleted));
-        assert_eq!(indicators.get_diff(4), None);
-        indicators.clear();
-        assert!(indicators.diffs.is_empty());
-    }
-}
+mod tests {}

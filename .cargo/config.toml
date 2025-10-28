@@ -1,0 +1,9 @@
+[build]
+# Optimize for development
+rustflags = []
+
+[rust-analyzer]
+# Disable proc macro expansion for faster analysis during development
+# Re-enable when you need full macro support
+checkOnSave.enable = false
+

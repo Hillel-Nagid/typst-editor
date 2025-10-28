@@ -3,7 +3,7 @@
 //! This crate contains all the UI components for the Typst editor,
 //! organized by functionality as defined in the project plan.
 
-#![recursion_limit = "2048"]
+#![allow(dead_code)]
 
 // Main component modules
 pub mod editor_view;
@@ -23,8 +23,15 @@ pub use preview_pane::PreviewPane;
 pub use sidebar::Sidebar;
 pub use panels::Panel;
 
-// Re-export Phase 3 types for convenience
-pub use decorations::{ DecorationManager, InlineDecoration, GutterDecoration, HighlightRange };
+pub use decorations::{
+    DecorationManager,
+    InlineDecoration,
+    InlineDecorationKind,
+    GutterDecoration,
+    GutterDecorationKind,
+    HighlightRange,
+    HighlightKind,
+};
 pub use input::{ InputHandler, KeyBindings };
 pub use rendering::{ TextShaper, FontManager, LineLayout, Viewport };
 pub use syntax::{ SyntaxHighlighter, Theme, ThemeManager };

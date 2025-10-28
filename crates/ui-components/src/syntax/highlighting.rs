@@ -27,31 +27,29 @@ impl SyntaxHighlighter {
     }
 
     /// Extract tokens from the syntax tree for highlighting
+    /// Uses iterative approach to avoid stack overflow on deep trees
     fn extract_tokens(node: &SyntaxNode) -> Vec<HighlightToken> {
         let mut tokens = Vec::new();
-        Self::visit_node(node, &mut tokens);
+        let mut stack = vec![node];
+
+        while let Some(current) = stack.pop() {
+            let token_type = Self::syntax_kind_to_token_type(current.kind());
+
+            if let Some(token_type) = token_type {
+                tokens.push(HighlightToken {
+                    start: 0, // TODO: Calculate actual byte offset in Phase 3 implementation
+                    end: 0, // TODO: Calculate actual byte offset in Phase 3 implementation
+                    token_type,
+                });
+            }
+
+            // Push children in reverse order to process in correct order
+            for child in current.children().rev() {
+                stack.push(child);
+            }
+        }
+
         tokens
-    }
-
-    /// Recursively visit nodes and extract token information
-    fn visit_node(node: &SyntaxNode, tokens: &mut Vec<HighlightToken>) {
-        let token_type = Self::syntax_kind_to_token_type(node.kind());
-
-        if let Some(token_type) = token_type {
-            // Get the text content and calculate byte positions
-            // In a full implementation, we'd track cumulative offsets
-            // For now, we'll use placeholders that will be refined during implementation
-            tokens.push(HighlightToken {
-                start: 0, // TODO: Calculate actual byte offset in Phase 3 implementation
-                end: 0, // TODO: Calculate actual byte offset in Phase 3 implementation
-                token_type,
-            });
-        }
-
-        // Recursively visit children
-        for child in node.children() {
-            Self::visit_node(child, tokens);
-        }
     }
 
     /// Map Typst SyntaxKind to our TokenType

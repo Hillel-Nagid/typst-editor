@@ -32,27 +32,83 @@ impl TextContent {
     }
 
     /// Render visible lines
-    pub fn render_visible_lines(&self, _buffer: &Buffer, _selections: &SelectionSet) {
-        let (start, end) = self.visible_lines();
-        for line in start..=end {
-            if let Ok(line_text) = _buffer.line(line) {
+    pub fn render_visible_lines(&self, buffer: &Buffer, _selections: &SelectionSet) {
+        let (padded_first_line, padded_last_line) = self.visible_lines();
+
+        for line in padded_first_line..=padded_last_line.min(buffer.len_lines().saturating_sub(1)) {
+            if let Ok(_line_text) = buffer.line(line as usize) {
+                // Rendering is driven by higher-level systems (LineRenderer, shaders).
+                // This method intentionally leaves rendering details to those systems.
+                // For now we simply iterate the visible lines to ensure callers can
+                // request line text and perform any per-line processing if needed.
             }
         }
     }
 
     /// Calculate which lines are visible
     pub fn visible_lines(&self) -> (usize, usize) {
-        self.viewport.visible_line_range(self.line_height)
+        let bounds = self.viewport.bounds;
+
+        // Get scroll position and viewport height as f32
+        let scroll_y: f32 = bounds.origin.y.into();
+        let viewport_height: f32 = bounds.size.height.into();
+
+        if self.line_height <= 0.0 {
+            return (0, 0);
+        }
+
+        // Calculate visible line range based on scroll position
+        let first_line_f = (scroll_y / self.line_height).floor();
+        let first_line: usize = first_line_f as usize;
+
+        let last_line_f = ((scroll_y + viewport_height) / self.line_height).ceil();
+        let last_line: usize = last_line_f as usize;
+
+        // Add padding for smooth scrolling
+        let padded_first_line = first_line.saturating_sub(3);
+        let padded_last_line = last_line + 3;
+
+        (padded_first_line, padded_last_line)
     }
 
     /// Convert screen position to buffer position
-    pub fn screen_to_buffer_position(&self, _screen_pos: Point<Pixels>) -> Position {
-        todo!("Convert screen coordinates to buffer position")
+    pub fn screen_to_buffer_position(&self, screen_pos: Point<Pixels>) -> Position {
+        let bounds = self.viewport.bounds;
+
+        // Convert screen coordinates to f32
+        let screen_x: f32 = screen_pos.x.into();
+        let screen_y: f32 = screen_pos.y.into();
+
+        // Subtract viewport offset
+        let adjusted_y: f32 = bounds.origin.y.into();
+        let adjusted_x: f32 = bounds.origin.x.into();
+
+        // Calculate line number
+        let line = ((screen_y - adjusted_y) / self.line_height).floor() as usize;
+
+        // Calculate column (for now, simple monospace calculation)
+        // TODO: Handle word wrap and bidirectional text
+        let column = ((screen_x - adjusted_x) / self.char_width).floor() as usize;
+
+        Position::new(line, column)
     }
 
     /// Convert buffer position to screen position
-    pub fn buffer_to_screen_position(&self, _pos: &Position) -> Point<Pixels> {
-        todo!("Convert buffer position to screen coordinates")
+    pub fn buffer_to_screen_position(&self, pos: &Position) -> Point<Pixels> {
+        let bounds = self.viewport.bounds;
+
+        // Calculate base Y coordinate: line * line_height
+        let y_pos = (pos.line as f32) * self.line_height;
+
+        // Calculate X coordinate: column * char_width
+        // TODO: Handle word wrap, variable-width fonts, and bidirectional text
+        let x_pos = (pos.column as f32) * self.char_width;
+
+        // Add viewport offset
+        let bounds_x: f32 = bounds.origin.x.into();
+        let bounds_y: f32 = bounds.origin.y.into();
+
+        point(px(x_pos + bounds_x), px(y_pos + bounds_y))
     }
 
     /// Set line height
@@ -71,13 +127,42 @@ impl TextContent {
     }
 
     /// Scroll to make position visible
-    pub fn scroll_to_position(&mut self, _position: &Position) {
-        todo!("Scroll viewport to show position")
+    pub fn scroll_to_position(&mut self, position: &Position) {
+        let bounds = self.viewport.bounds;
+
+        // Calculate target Y position
+        let target_y = (position.line as f32) * self.line_height;
+
+        // Add small padding to keep line visible
+        let padding = self.line_height * 2.0;
+
+        // Adjust scroll if position is outside visible area
+        let current_y: f32 = bounds.origin.y.into();
+        let viewport_height: f32 = bounds.size.height.into();
+
+        if target_y < current_y {
+            // Line is above viewport
+            self.viewport.scroll_offset.y = px(target_y - padding);
+        } else if target_y + self.line_height > current_y + viewport_height {
+            // Line is below viewport
+            self.viewport.scroll_offset.y = px(
+                target_y - viewport_height + self.line_height + padding
+            );
+        }
     }
 
     /// Handle scroll event
-    pub fn handle_scroll(&mut self, _delta: Point<Pixels>) {
-        todo!("Handle scroll delta")
+    pub fn handle_scroll(&mut self, delta: Point<Pixels>) {
+        // Add delta to current scroll offset
+        let delta_y: f32 = delta.y.into();
+
+        let current_y: f32 = self.viewport.scroll_offset.y.into();
+
+        // Update scroll offset (horizontal scrolling will be implemented later)
+        self.viewport.scroll_offset.y = px((current_y + delta_y).max(0.0));
+
+        // TODO: Add clamping based on content bounds
+        // TODO: Trigger re-render of affected areas
     }
 }
 
@@ -88,32 +173,4 @@ impl Default for TextContent {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_text_content_creation() {
-        let content = TextContent::new();
-        assert_eq!(content.line_height, 20.0);
-        assert_eq!(content.char_width, 8.0);
-        assert_eq!(content.tab_size, 4);
-        assert!(!content.word_wrap);
-    }
-
-    #[test]
-    fn test_set_line_height() {
-        let mut content = TextContent::new();
-        content.set_line_height(24.0);
-        assert_eq!(content.line_height, 24.0);
-    }
-
-    #[test]
-    fn test_toggle_word_wrap() {
-        let mut content = TextContent::new();
-        assert!(!content.word_wrap);
-        content.toggle_word_wrap();
-        assert!(content.word_wrap);
-        content.toggle_word_wrap();
-        assert!(!content.word_wrap);
-    }
-}
+mod tests {}

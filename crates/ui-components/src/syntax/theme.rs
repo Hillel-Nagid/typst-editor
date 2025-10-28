@@ -18,11 +18,93 @@ pub struct Theme {
 
 impl Theme {
     pub fn default_light() -> Self {
-        todo!("Implement default light theme")
+        Self {
+            name: "Light".to_string(),
+            variant: ThemeVariant::Light,
+            colors: ColorScheme {
+                background: Srgb::new(1.0, 1.0, 1.0),
+                foreground: Srgb::new(0.0, 0.0, 0.0),
+                border: Srgb::new(0.8, 0.8, 0.8),
+                selection: Srgb::new(0.0, 0.5, 0.9),
+                cursor: Srgb::new(0.0, 0.0, 0.0),
+                current_line: Srgb::new(0.95, 0.95, 0.95),
+                keyword: Srgb::new(0.7, 0.1, 0.3),
+                function: Srgb::new(0.1, 0.3, 0.8),
+                variable: Srgb::new(0.0, 0.0, 0.0),
+                constant: Srgb::new(0.6, 0.2, 0.5),
+                string: Srgb::new(0.2, 0.6, 0.3),
+                comment: Srgb::new(0.4, 0.4, 0.4),
+                type_name: Srgb::new(0.4, 0.2, 0.7),
+                operator: Srgb::new(0.5, 0.5, 0.5),
+                error: Srgb::new(1.0, 0.0, 0.0),
+                warning: Srgb::new(1.0, 0.6, 0.0),
+                info: Srgb::new(0.0, 0.5, 0.9),
+                hint: Srgb::new(0.5, 0.5, 0.5),
+                button_background: Srgb::new(0.9, 0.9, 0.9),
+                button_hover: Srgb::new(0.8, 0.8, 0.8),
+                input_background: Srgb::new(1.0, 1.0, 1.0),
+                panel_background: Srgb::new(0.95, 0.95, 0.95),
+                sidebar_background: Srgb::new(0.92, 0.92, 0.92),
+                statusbar_background: Srgb::new(0.88, 0.88, 0.88),
+            },
+            typography: Typography {
+                editor_font: "Consolas".to_string(),
+                editor_size: 14.0,
+                ui_font: "Segoe UI".to_string(),
+                ui_size: 12.0,
+                line_height: 1.5,
+            },
+            spacing: Spacing {
+                gutter_width: 50.0,
+                line_padding: 2.0,
+                panel_padding: 8.0,
+            },
+        }
     }
 
     pub fn default_dark() -> Self {
-        todo!("Implement default dark theme")
+        Self {
+            name: "Dark".to_string(),
+            variant: ThemeVariant::Dark,
+            colors: ColorScheme {
+                background: Srgb::new(0.1, 0.1, 0.1),
+                foreground: Srgb::new(0.9, 0.9, 0.9),
+                border: Srgb::new(0.3, 0.3, 0.3),
+                selection: Srgb::new(0.2, 0.5, 0.8),
+                cursor: Srgb::new(1.0, 1.0, 1.0),
+                current_line: Srgb::new(0.15, 0.15, 0.15),
+                keyword: Srgb::new(0.9, 0.4, 0.6),
+                function: Srgb::new(0.4, 0.6, 0.9),
+                variable: Srgb::new(0.9, 0.9, 0.9),
+                constant: Srgb::new(0.8, 0.4, 0.7),
+                string: Srgb::new(0.4, 0.8, 0.5),
+                comment: Srgb::new(0.5, 0.5, 0.5),
+                type_name: Srgb::new(0.6, 0.4, 0.8),
+                operator: Srgb::new(0.7, 0.7, 0.7),
+                error: Srgb::new(1.0, 0.3, 0.3),
+                warning: Srgb::new(1.0, 0.7, 0.3),
+                info: Srgb::new(0.3, 0.7, 1.0),
+                hint: Srgb::new(0.7, 0.7, 0.7),
+                button_background: Srgb::new(0.2, 0.2, 0.2),
+                button_hover: Srgb::new(0.3, 0.3, 0.3),
+                input_background: Srgb::new(0.15, 0.15, 0.15),
+                panel_background: Srgb::new(0.12, 0.12, 0.12),
+                sidebar_background: Srgb::new(0.14, 0.14, 0.14),
+                statusbar_background: Srgb::new(0.16, 0.16, 0.16),
+            },
+            typography: Typography {
+                editor_font: "Consolas".to_string(),
+                editor_size: 14.0,
+                ui_font: "Segoe UI".to_string(),
+                ui_size: 12.0,
+                line_height: 1.5,
+            },
+            spacing: Spacing {
+                gutter_width: 50.0,
+                line_padding: 2.0,
+                panel_padding: 8.0,
+            },
+        }
     }
 }
 
@@ -173,7 +255,8 @@ impl ThemeManager {
     }
 
     pub fn load_theme(&mut self, _path: &str) -> Result<(), Box<dyn std::error::Error>> {
-        todo!("Implement theme loading from file")
+        // TODO: Implement theme loading from file
+        Ok(())
     }
 }
 
