@@ -1,7 +1,7 @@
 use crate::buffer::command::BufferSnapshot;
 use crate::buffer::command_types::SnapshotCommand;
 use crate::buffer::{History, RopeBuffer, TextBuffer};
-use crate::bidi_text::{Direction, layout_line, move_visual_horizontal};
+use crate::bidi_text::{Direction, LineDirection, detect_line_directions, layout_line, move_visual_horizontal};
 use crate::document::LineEnding;
 use crate::operations::auto_pair::matching_pair;
 use crate::operations::word_boundary::{find_next_word_start, find_prev_word_start};
@@ -362,7 +362,15 @@ impl EditorSession {
         let line_start = self.buffer.line_col_to_offset(line_idx, 0);
         let raw_line = self.buffer.line(line_idx).unwrap_or_default();
         let line_text = raw_line.trim_end_matches(['\n', '\r']);
-        let visual = layout_line(line_text, Direction::Ltr);
+        let line_direction = detect_line_directions(&[line_text.to_string()], Direction::Ltr)
+            .first()
+            .copied()
+            .unwrap_or(LineDirection::Ltr);
+        let base_direction = match line_direction {
+            LineDirection::Rtl => Direction::Rtl,
+            LineDirection::Ltr | LineDirection::Math => Direction::Ltr,
+        };
+        let visual = layout_line(line_text, base_direction);
         let bounded_col = col.min(line_text.chars().count());
         let next_col = move_visual_horizontal(&visual, bounded_col, delta);
         line_start + next_col

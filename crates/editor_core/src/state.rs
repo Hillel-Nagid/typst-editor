@@ -206,9 +206,18 @@ impl EditorState {
     }
 
     pub fn visual_lines(&self) -> Vec<crate::bidi_text::VisualLine> {
-        self.lines()
+        let lines = self.lines();
+        let directions = detect_line_directions(&lines, Direction::Ltr);
+        lines
             .iter()
-            .map(|line| layout_line(line, Direction::Ltr))
+            .zip(directions.iter().copied())
+            .map(|(line, dir)| {
+                let base_direction = match dir {
+                    LineDirection::Rtl => Direction::Rtl,
+                    LineDirection::Ltr | LineDirection::Math => Direction::Ltr,
+                };
+                layout_line(line, base_direction)
+            })
             .collect()
     }
 

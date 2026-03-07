@@ -2,7 +2,7 @@ use crate::theme::Theme;
 use crate::workspace::main_window_view;
 use editor_core::{ApplicationState, Config, Document, WorkspaceState};
 use iced::keyboard::{self, Key, Modifiers, key};
-use iced::{Element, Subscription, Task, application};
+use iced::{Element, Subscription, Task, application, event};
 use parking_lot::RwLock;
 use std::sync::Arc;
 
@@ -150,81 +150,7 @@ impl TypstEditorApp {
     }
 
     fn subscription(&self) -> Subscription<Message> {
-        keyboard::on_key_press(|key: Key, modifiers: Modifiers| {
-            if !modifiers.command() {
-                return match key.as_ref() {
-                    Key::Named(key::Named::Enter) => Some(Message::EditorKey(EditorKey::Enter)),
-                    Key::Named(key::Named::Backspace) => {
-                        Some(Message::EditorKey(EditorKey::Backspace))
-                    }
-                    Key::Named(key::Named::Delete) => Some(Message::EditorKey(EditorKey::Delete)),
-                    Key::Named(key::Named::Tab) => Some(Message::EditorKey(EditorKey::Tab {
-                        shift: modifiers.shift(),
-                    })),
-                    Key::Named(key::Named::ArrowLeft) => Some(Message::EditorKey(EditorKey::Left {
-                        shift: modifiers.shift(),
-                        by_word: modifiers.alt(),
-                    })),
-                    Key::Named(key::Named::ArrowRight) => {
-                        Some(Message::EditorKey(EditorKey::Right {
-                            shift: modifiers.shift(),
-                            by_word: modifiers.alt(),
-                        }))
-                    }
-                    Key::Named(key::Named::ArrowUp) => {
-                        Some(Message::EditorKey(EditorKey::Up { shift: modifiers.shift() }))
-                    }
-                    Key::Named(key::Named::ArrowDown) => {
-                        Some(Message::EditorKey(EditorKey::Down { shift: modifiers.shift() }))
-                    }
-                    Key::Named(key::Named::Home) => {
-                        Some(Message::EditorKey(EditorKey::Home { shift: modifiers.shift() }))
-                    }
-                    Key::Named(key::Named::End) => {
-                        Some(Message::EditorKey(EditorKey::End { shift: modifiers.shift() }))
-                    }
-                    Key::Character(text) => {
-                        if modifiers.control() {
-                            None
-                        } else {
-                            Some(Message::EditorKey(EditorKey::InsertText(normalize_insert_text(
-                                text,
-                                modifiers.shift(),
-                            ))))
-                        }
-                    }
-                    _ => None,
-                };
-            }
-
-            match key.as_ref() {
-                Key::Character(text) if text.eq_ignore_ascii_case("z") && modifiers.shift() => {
-                    Some(Message::KeyboardShortcut(Shortcut::Redo))
-                }
-                Key::Character(text) if text.eq_ignore_ascii_case("z") => {
-                    Some(Message::KeyboardShortcut(Shortcut::Undo))
-                }
-                Key::Character("/") => Some(Message::KeyboardShortcut(Shortcut::ToggleComment)),
-                Key::Named(key::Named::ArrowLeft) => Some(Message::EditorKey(EditorKey::Left {
-                    shift: modifiers.shift(),
-                    by_word: true,
-                })),
-                Key::Named(key::Named::ArrowRight) => {
-                    Some(Message::EditorKey(EditorKey::Right {
-                        shift: modifiers.shift(),
-                        by_word: true,
-                    }))
-                }
-                Key::Named(key::Named::Home) => Some(Message::EditorKey(EditorKey::DocStart {
-                    shift: modifiers.shift(),
-                })),
-                Key::Named(key::Named::End) => Some(Message::EditorKey(EditorKey::DocEnd {
-                    shift: modifiers.shift(),
-                })),
-                Key::Named(key::Named::F5) => None,
-                _ => None,
-            }
-        })
+        event::listen_with(handle_runtime_event)
     }
 }
 
@@ -239,45 +165,112 @@ fn workspace_state_config_tab_settings(workspace: &WorkspaceState) -> (usize, bo
     (4, true)
 }
 
-fn normalize_insert_text(text: &str, shift_pressed: bool) -> String {
-    if !shift_pressed {
-        return text.to_string();
+fn handle_runtime_event(
+    runtime_event: iced::Event,
+    status: event::Status,
+    _window: iced::window::Id,
+) -> Option<Message> {
+    if status == event::Status::Captured {
+        return None;
     }
 
-    if text.chars().count() != 1 {
-        return text.to_string();
-    }
-
-    let ch = text.chars().next().unwrap_or_default();
-    if ch.is_ascii_lowercase() {
-        return ch.to_ascii_uppercase().to_string();
-    }
-
-    let shifted = match ch {
-        '`' => '~',
-        '1' => '!',
-        '2' => '@',
-        '3' => '#',
-        '4' => '$',
-        '5' => '%',
-        '6' => '^',
-        '7' => '&',
-        '8' => '*',
-        '9' => '(',
-        '0' => ')',
-        '-' => '_',
-        '=' => '+',
-        '[' => '{',
-        ']' => '}',
-        '\\' => '|',
-        ';' => ':',
-        '\'' => '"',
-        ',' => '<',
-        '.' => '>',
-        '/' => '?',
-        _ => ch,
+    let iced::Event::Keyboard(keyboard::Event::KeyPressed {
+        key,
+        modifiers,
+        text,
+        ..
+    }) = runtime_event
+    else {
+        return None;
     };
-    shifted.to_string()
+
+    map_key_to_message(key, modifiers, text.as_deref())
+}
+
+fn map_key_to_message(key: Key, modifiers: Modifiers, text: Option<&str>) -> Option<Message> {
+    if modifiers.command() {
+        return match key.as_ref() {
+            Key::Character(char_text) if char_text.eq_ignore_ascii_case("z") && modifiers.shift() => {
+                Some(Message::KeyboardShortcut(Shortcut::Redo))
+            }
+            Key::Character(char_text) if char_text.eq_ignore_ascii_case("z") => {
+                Some(Message::KeyboardShortcut(Shortcut::Undo))
+            }
+            Key::Character("/") => Some(Message::KeyboardShortcut(Shortcut::ToggleComment)),
+            Key::Named(key::Named::ArrowLeft) => Some(Message::EditorKey(EditorKey::Left {
+                shift: modifiers.shift(),
+                by_word: true,
+            })),
+            Key::Named(key::Named::ArrowRight) => {
+                Some(Message::EditorKey(EditorKey::Right {
+                    shift: modifiers.shift(),
+                    by_word: true,
+                }))
+            }
+            Key::Named(key::Named::Home) => Some(Message::EditorKey(EditorKey::DocStart {
+                shift: modifiers.shift(),
+            })),
+            Key::Named(key::Named::End) => Some(Message::EditorKey(EditorKey::DocEnd {
+                shift: modifiers.shift(),
+            })),
+            _ => None,
+        };
+    }
+
+    match key.as_ref() {
+        Key::Named(key::Named::Enter) => Some(Message::EditorKey(EditorKey::Enter)),
+        Key::Named(key::Named::Backspace) => Some(Message::EditorKey(EditorKey::Backspace)),
+        Key::Named(key::Named::Delete) => Some(Message::EditorKey(EditorKey::Delete)),
+        Key::Named(key::Named::Tab) => Some(Message::EditorKey(EditorKey::Tab {
+            shift: modifiers.shift(),
+        })),
+        Key::Named(key::Named::ArrowLeft) => Some(Message::EditorKey(EditorKey::Left {
+            shift: modifiers.shift(),
+            by_word: modifiers.alt(),
+        })),
+        Key::Named(key::Named::ArrowRight) => Some(Message::EditorKey(EditorKey::Right {
+            shift: modifiers.shift(),
+            by_word: modifiers.alt(),
+        })),
+        Key::Named(key::Named::ArrowUp) => Some(Message::EditorKey(EditorKey::Up {
+            shift: modifiers.shift(),
+        })),
+        Key::Named(key::Named::ArrowDown) => Some(Message::EditorKey(EditorKey::Down {
+            shift: modifiers.shift(),
+        })),
+        Key::Named(key::Named::Home) => Some(Message::EditorKey(EditorKey::Home {
+            shift: modifiers.shift(),
+        })),
+        Key::Named(key::Named::End) => Some(Message::EditorKey(EditorKey::End {
+            shift: modifiers.shift(),
+        })),
+        Key::Character(char_text) => {
+            if modifiers.control() {
+                None
+            } else if let Some(text_payload) = text.filter(|s| !s.is_empty()) {
+                Some(Message::EditorKey(EditorKey::InsertText(
+                    text_payload.to_string(),
+                )))
+            } else {
+                Some(Message::EditorKey(EditorKey::InsertText(
+                    normalize_insert_text(char_text),
+                )))
+            }
+        }
+        _ => {
+            if modifiers.control() {
+                None
+            } else {
+                text.filter(|s| !s.is_empty()).map(|text_payload| {
+                    Message::EditorKey(EditorKey::InsertText(text_payload.to_string()))
+                })
+            }
+        }
+    }
+}
+
+fn normalize_insert_text(text: &str) -> String {
+    text.to_string()
 }
 
 #[cfg(test)]
@@ -285,26 +278,16 @@ mod tests {
     use super::normalize_insert_text;
 
     #[test]
-    fn normalize_insert_text_preserves_unshifted_input() {
-        assert_eq!(normalize_insert_text("a", false), "a");
-        assert_eq!(normalize_insert_text("1", false), "1");
-        assert_eq!(normalize_insert_text("/", false), "/");
-    }
-
-    #[test]
-    fn normalize_insert_text_applies_shift_to_letters_and_symbols() {
-        assert_eq!(normalize_insert_text("a", true), "A");
-        assert_eq!(normalize_insert_text("z", true), "Z");
-        assert_eq!(normalize_insert_text("1", true), "!");
-        assert_eq!(normalize_insert_text("2", true), "@");
-        assert_eq!(normalize_insert_text("/", true), "?");
-        assert_eq!(normalize_insert_text("=", true), "+");
-        assert_eq!(normalize_insert_text("`", true), "~");
+    fn normalize_insert_text_preserves_input_as_is() {
+        assert_eq!(normalize_insert_text("a"), "a");
+        assert_eq!(normalize_insert_text("A"), "A");
+        assert_eq!(normalize_insert_text("1"), "1");
+        assert_eq!(normalize_insert_text("ש"), "ש");
     }
 
     #[test]
     fn normalize_insert_text_leaves_multichar_text_unchanged() {
-        assert_eq!(normalize_insert_text("ab", true), "ab");
-        assert_eq!(normalize_insert_text("ß", true), "ß");
+        assert_eq!(normalize_insert_text("ab"), "ab");
+        assert_eq!(normalize_insert_text("ß"), "ß");
     }
 }
