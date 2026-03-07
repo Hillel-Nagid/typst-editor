@@ -184,11 +184,13 @@ impl TypstEditorApp {
                         Some(Message::EditorKey(EditorKey::End { shift: modifiers.shift() }))
                     }
                     Key::Character(text) => {
-                        if modifiers.alt() || modifiers.control() {
+                        if modifiers.control() {
                             None
                         } else {
-                            let normalized = normalize_insert_text(text, modifiers);
-                            Some(Message::EditorKey(EditorKey::InsertText(normalized)))
+                            Some(Message::EditorKey(EditorKey::InsertText(normalize_insert_text(
+                                text,
+                                modifiers.shift(),
+                            ))))
                         }
                     }
                     _ => None,
@@ -237,8 +239,8 @@ fn workspace_state_config_tab_settings(workspace: &WorkspaceState) -> (usize, bo
     (4, true)
 }
 
-fn normalize_insert_text(text: &str, modifiers: Modifiers) -> String {
-    if !modifiers.shift() {
+fn normalize_insert_text(text: &str, shift_pressed: bool) -> String {
+    if !shift_pressed {
         return text.to_string();
     }
 
@@ -248,8 +250,61 @@ fn normalize_insert_text(text: &str, modifiers: Modifiers) -> String {
 
     let ch = text.chars().next().unwrap_or_default();
     if ch.is_ascii_lowercase() {
-        ch.to_ascii_uppercase().to_string()
-    } else {
-        text.to_string()
+        return ch.to_ascii_uppercase().to_string();
+    }
+
+    let shifted = match ch {
+        '`' => '~',
+        '1' => '!',
+        '2' => '@',
+        '3' => '#',
+        '4' => '$',
+        '5' => '%',
+        '6' => '^',
+        '7' => '&',
+        '8' => '*',
+        '9' => '(',
+        '0' => ')',
+        '-' => '_',
+        '=' => '+',
+        '[' => '{',
+        ']' => '}',
+        '\\' => '|',
+        ';' => ':',
+        '\'' => '"',
+        ',' => '<',
+        '.' => '>',
+        '/' => '?',
+        _ => ch,
+    };
+    shifted.to_string()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::normalize_insert_text;
+
+    #[test]
+    fn normalize_insert_text_preserves_unshifted_input() {
+        assert_eq!(normalize_insert_text("a", false), "a");
+        assert_eq!(normalize_insert_text("1", false), "1");
+        assert_eq!(normalize_insert_text("/", false), "/");
+    }
+
+    #[test]
+    fn normalize_insert_text_applies_shift_to_letters_and_symbols() {
+        assert_eq!(normalize_insert_text("a", true), "A");
+        assert_eq!(normalize_insert_text("z", true), "Z");
+        assert_eq!(normalize_insert_text("1", true), "!");
+        assert_eq!(normalize_insert_text("2", true), "@");
+        assert_eq!(normalize_insert_text("/", true), "?");
+        assert_eq!(normalize_insert_text("=", true), "+");
+        assert_eq!(normalize_insert_text("`", true), "~");
+    }
+
+    #[test]
+    fn normalize_insert_text_leaves_multichar_text_unchanged() {
+        assert_eq!(normalize_insert_text("ab", true), "ab");
+        assert_eq!(normalize_insert_text("ß", true), "ß");
     }
 }

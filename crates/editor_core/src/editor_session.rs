@@ -1,6 +1,7 @@
 use crate::buffer::command::BufferSnapshot;
 use crate::buffer::command_types::SnapshotCommand;
 use crate::buffer::{History, RopeBuffer, TextBuffer};
+use crate::bidi_text::{Direction, layout_line, move_visual_horizontal};
 use crate::document::LineEnding;
 use crate::operations::auto_pair::matching_pair;
 use crate::operations::word_boundary::{find_next_word_start, find_prev_word_start};
@@ -314,8 +315,8 @@ impl EditorSession {
         for mut cursor in cursors {
             let pos = cursor.position();
             let target = match direction {
-                MoveDirection::Left => self.buffer.prev_grapheme(pos),
-                MoveDirection::Right => self.buffer.next_grapheme(pos),
+                MoveDirection::Left => self.horizontal_visual_move(pos, -1),
+                MoveDirection::Right => self.horizontal_visual_move(pos, 1),
                 MoveDirection::WordLeft => find_prev_word_start(&text, pos),
                 MoveDirection::WordRight => find_next_word_start(&text, pos),
                 MoveDirection::LineStart => {
@@ -354,6 +355,17 @@ impl EditorSession {
             (line + delta as usize).min(self.buffer.line_count().saturating_sub(1))
         };
         self.buffer.line_col_to_offset(target_line, col)
+    }
+
+    fn horizontal_visual_move(&self, offset: usize, delta: isize) -> usize {
+        let (line_idx, col) = self.buffer.offset_to_line_col(offset);
+        let line_start = self.buffer.line_col_to_offset(line_idx, 0);
+        let raw_line = self.buffer.line(line_idx).unwrap_or_default();
+        let line_text = raw_line.trim_end_matches(['\n', '\r']);
+        let visual = layout_line(line_text, Direction::Ltr);
+        let bounded_col = col.min(line_text.chars().count());
+        let next_col = move_visual_horizontal(&visual, bounded_col, delta);
+        line_start + next_col
     }
 
     fn transform_selections<F>(&mut self, transform: F, key: &str)

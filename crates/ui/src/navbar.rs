@@ -1,8 +1,8 @@
 use crate::app::Message;
 use crate::theme::Theme;
 use iced::alignment::Vertical;
-use iced::widget::{button, container, row, text};
-use iced::{Alignment, Background, Border, Color, Element, Length, Padding};
+use iced::widget::{ button, container, row, text };
+use iced::{ Alignment, Background, Border, Color, Element, Length, Padding };
 
 pub fn navbar_view(theme: &Theme) -> Element<'static, Message> {
     let bg_color = theme.parse_color(&theme.background.titlebar);
@@ -19,7 +19,7 @@ pub fn navbar_view(theme: &Theme) -> Element<'static, Message> {
                 border: Border {
                     color: Color::TRANSPARENT,
                     width: 0.0,
-                    radius: 4.0.into(),
+                    radius: (4.0).into(),
                 },
                 ..Default::default()
             })
@@ -34,18 +34,15 @@ pub fn navbar_view(theme: &Theme) -> Element<'static, Message> {
             menu_button("View", Message::TogglePreview),
             menu_button("Tools", Message::ToggleConsole),
             menu_button("Undo", Message::UndoEdit),
-            menu_button("Redo", Message::RedoEdit),
-            menu_button("Comment", Message::ToggleLineComment),
+            menu_button("Redo", Message::RedoEdit)
         ]
-        .spacing(12)
-        .align_y(Vertical::Center),
-        row![text("Search"), text("Settings")]
             .spacing(12)
             .align_y(Vertical::Center),
+        row![text("Search"), text("Settings")].spacing(12).align_y(Vertical::Center)
     ]
-    .width(Length::Fill)
-    .align_y(Vertical::Center)
-    .spacing(16);
+        .width(Length::Fill)
+        .align_y(Vertical::Center)
+        .spacing(16);
 
     container(content)
         .width(Length::Fill)
@@ -56,7 +53,7 @@ pub fn navbar_view(theme: &Theme) -> Element<'static, Message> {
             border: Border {
                 color: border_color,
                 width: 1.0,
-                radius: 0.0.into(),
+                radius: (0.0).into(),
             },
             ..Default::default()
         })

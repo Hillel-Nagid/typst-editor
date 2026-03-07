@@ -1,7 +1,9 @@
 use crate::theme::Theme;
+use crate::{bidi_renderer, selection_painter};
 use editor_core::ApplicationState;
+use editor_core::LineDirection;
 use iced::widget::{column, container, row, scrollable, text};
-use iced::{Background, Border, Color, Element, Length, Padding};
+use iced::{Background, Border, Color, Element, Length, Padding, alignment};
 use parking_lot::RwLock;
 use std::ops::Range;
 use std::sync::Arc;
@@ -16,7 +18,7 @@ pub fn editor_view(
     let gutter_fg = theme.parse_color(&theme.foreground.gutter);
     let border_color = theme.parse_color(&theme.ui.border);
 
-    let (lines, line_selections, line_cursor_cols, cursor_line) =
+    let (lines, visual_lines, directions, line_selections, line_cursor_cols, cursor_line) =
         if let Some(workspace) = state.read().get_active_workspace() {
         let workspace = workspace.read();
         if let Some(editor) = workspace.get_active_editor() {
@@ -24,15 +26,27 @@ pub fn editor_view(
             let content = editor.content();
             let cursors = editor.cursors().cursors().to_vec();
             let lines = split_lines_preserving_trailing(&content);
+            let visual_lines = editor.visual_lines();
+            let directions = editor.line_directions();
             let line_start_offsets = compute_line_start_offsets(&content);
             let line_ranges = compute_line_content_ranges(&line_start_offsets, content.chars().count());
             let line_selections = compute_line_selections(&lines, &line_start_offsets, &line_ranges, &cursors);
-            let line_cursor_cols = compute_line_cursor_cols(&lines, &line_start_offsets, &cursors);
+            let line_cursor_cols =
+                compute_line_cursor_visual_cols(&lines, &line_start_offsets, &cursors, &visual_lines);
             let (line_idx, _) = offset_to_line_col(&line_start_offsets, cursors[editor.cursors().primary_index()].position());
-            (lines, line_selections, line_cursor_cols, line_idx)
+            (
+                lines,
+                visual_lines,
+                directions,
+                line_selections,
+                line_cursor_cols,
+                line_idx,
+            )
         } else {
             (
                 vec!["// No document open".to_string()],
+                vec![editor_core::layout_line("// No document open", editor_core::Direction::Ltr)],
+                vec![LineDirection::Ltr],
                 vec![Vec::new()],
                 vec![Vec::new()],
                 0,
@@ -41,6 +55,8 @@ pub fn editor_view(
     } else {
         (
             vec!["// No workspace".to_string()],
+            vec![editor_core::layout_line("// No workspace", editor_core::Direction::Ltr)],
+            vec![LineDirection::Ltr],
             vec![Vec::new()],
             vec![Vec::new()],
             0,
@@ -66,16 +82,31 @@ pub fn editor_view(
             } else {
                 Color::TRANSPARENT
             };
-            let rendered_line = render_line_with_cursors_and_selection(
-                line,
-                line_selections.get(idx).cloned().unwrap_or_default(),
+            let visual_line = visual_lines
+                .get(idx)
+                .cloned()
+                .unwrap_or_else(|| editor_core::layout_line(&line, editor_core::Direction::Ltr));
+            let visual_chars = bidi_renderer::visual_order_chars(&line, &visual_line);
+            let visual_selections = selection_painter::visual_selection_ranges(
+                &visual_line,
+                &line_selections.get(idx).cloned().unwrap_or_default(),
+            );
+            let rendered_line = render_visual_line_with_cursors_and_selection(
+                visual_chars,
+                visual_selections,
                 line_cursor_cols.get(idx).cloned().unwrap_or_default(),
                 selection_bg,
                 selection_fg,
                 cursor_color,
             );
+            let align = match directions.get(idx).copied().unwrap_or(LineDirection::Ltr) {
+                LineDirection::Rtl => alignment::Horizontal::Right,
+                LineDirection::Math | LineDirection::Ltr => alignment::Horizontal::Left,
+            };
             col.push(
                 container(rendered_line)
+                    .align_x(align)
+                    .width(Length::Fill)
                     .padding(Padding::from([0.0, 8.0]))
                     .style(move |_| iced::widget::container::Style {
                         background: Some(Background::Color(line_bg)),
@@ -120,7 +151,10 @@ fn split_lines_preserving_trailing(content: &str) -> Vec<String> {
     if content.is_empty() {
         return vec![String::new()];
     }
-    content.split('\n').map(|line| line.to_string()).collect()
+    content
+        .split('\n')
+        .map(|line| line.trim_end_matches('\r').to_string())
+        .collect()
 }
 
 fn compute_line_start_offsets(content: &str) -> Vec<usize> {
@@ -146,13 +180,10 @@ fn compute_line_content_ranges(line_starts: &[usize], content_len: usize) -> Vec
     ranges
 }
 
-fn line_display_chars(line: &str) -> Vec<char> {
-    line.chars().filter(|ch| *ch != '\r').collect()
-}
-
 fn display_col_from_global_offset(line: &str, line_start: usize, offset: usize) -> usize {
-    let raw_col = offset.saturating_sub(line_start).min(line.chars().count());
-    line.chars().take(raw_col).filter(|ch| *ch != '\r').count()
+    offset
+        .saturating_sub(line_start)
+        .min(line.chars().count())
 }
 
 fn offset_to_line_col(line_starts: &[usize], offset: usize) -> (usize, usize) {
@@ -190,31 +221,35 @@ fn compute_line_selections(
     all
 }
 
-fn compute_line_cursor_cols(
+fn compute_line_cursor_visual_cols(
     lines: &[String],
     line_starts: &[usize],
     cursors: &[editor_core::Cursor],
+    visual_lines: &[editor_core::VisualLine],
 ) -> Vec<Vec<usize>> {
     let mut all = vec![Vec::new(); lines.len()];
     for cursor in cursors {
         let position = cursor.position();
         let (line_idx, _) = offset_to_line_col(line_starts, position);
-        let display_col = display_col_from_global_offset(&lines[line_idx], line_starts[line_idx], position);
-        all[line_idx].push(display_col);
+        let logical_col = display_col_from_global_offset(&lines[line_idx], line_starts[line_idx], position);
+        let visual_col = visual_lines
+            .get(line_idx)
+            .map(|line| line.logical_to_visual(logical_col).round() as usize)
+            .unwrap_or(logical_col);
+        all[line_idx].push(visual_col);
     }
     all
 }
 
-fn render_line_with_cursors_and_selection(
-    line: String,
+fn render_visual_line_with_cursors_and_selection(
+    visual_chars: Vec<char>,
     selections: Vec<Range<usize>>,
     cursor_cols: Vec<usize>,
     selection_bg: Color,
     selection_fg: Color,
     cursor_color: Color,
 ) -> iced::widget::Row<'static, crate::app::Message> {
-    let chars = line_display_chars(&line);
-    let display_len = chars.len();
+    let display_len = visual_chars.len();
     let mut row_widget = row!().spacing(0).height(Length::Shrink);
 
     for col in 0..=display_len {
@@ -231,12 +266,16 @@ fn render_line_with_cursors_and_selection(
         }
 
         if col < display_len {
-            let ch = chars[col];
+            let ch = visual_chars[col];
             let selected = selections
                 .iter()
                 .any(|range| col >= range.start && col < range.end);
             row_widget = row_widget.push(
-                container(text(ch.to_string()).size(14))
+                container(
+                    text(ch.to_string())
+                        .size(14)
+                        .shaping(iced::widget::text::Shaping::Advanced),
+                )
                     .padding(Padding::from([0.0, 0.0]))
                     .style(move |_| iced::widget::container::Style {
                         background: selected.then_some(Background::Color(selection_bg)),

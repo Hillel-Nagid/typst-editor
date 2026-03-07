@@ -1,4 +1,7 @@
 use crate::config::Config;
+use crate::bidi_text::{Direction, LineDirection, detect_line_directions, layout_line};
+use crate::bidi_text::layout::hit_test::visual_to_logical as hit_test_visual_to_logical;
+use crate::bidi_text::layout::selection_ranges::selection_ranges as compute_selection_ranges;
 use crate::document::{Document, DocumentId};
 use crate::editor_session::EditorSession;
 use crate::editor_session::MoveDirection;
@@ -200,6 +203,50 @@ impl EditorState {
             return vec![String::new()];
         }
         text.split('\n').map(|line| line.to_string()).collect()
+    }
+
+    pub fn visual_lines(&self) -> Vec<crate::bidi_text::VisualLine> {
+        self.lines()
+            .iter()
+            .map(|line| layout_line(line, Direction::Ltr))
+            .collect()
+    }
+
+    pub fn line_directions(&self) -> Vec<LineDirection> {
+        detect_line_directions(&self.lines(), Direction::Ltr)
+    }
+
+    pub fn hit_test_visual_x(&self, line_index: usize, visual_x: f32) -> Option<usize> {
+        let lines = self.lines();
+        let line = lines.get(line_index)?;
+        let visual = layout_line(line, Direction::Ltr);
+        let line_start = lines
+            .iter()
+            .take(line_index)
+            .map(|l| l.chars().count() + 1)
+            .sum::<usize>();
+        Some(line_start + hit_test_visual_to_logical(&visual, visual_x))
+    }
+
+    pub fn visual_selection_ranges_for_line(
+        &self,
+        line_index: usize,
+        selection_start: usize,
+        selection_end: usize,
+    ) -> Vec<(f32, f32)> {
+        let lines = self.lines();
+        let Some(line) = lines.get(line_index) else {
+            return Vec::new();
+        };
+        let visual = layout_line(line, Direction::Ltr);
+        let line_start = lines
+            .iter()
+            .take(line_index)
+            .map(|l| l.chars().count() + 1)
+            .sum::<usize>();
+        let local_start = selection_start.saturating_sub(line_start).min(line.chars().count());
+        let local_end = selection_end.saturating_sub(line_start).min(line.chars().count());
+        compute_selection_ranges(&visual, local_start.min(local_end), local_start.max(local_end))
     }
 
     pub fn move_left(&mut self, extend_selection: bool) {
