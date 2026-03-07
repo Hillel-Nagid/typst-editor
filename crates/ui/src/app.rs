@@ -1,39 +1,255 @@
 use crate::theme::Theme;
-use crate::workspace::MainWindow;
-use editor_core::{ ApplicationState, Config, WorkspaceState };
-use gpui::*;
+use crate::workspace::main_window_view;
+use editor_core::{ApplicationState, Config, Document, WorkspaceState};
+use iced::keyboard::{self, Key, Modifiers, key};
+use iced::{Element, Subscription, Task, application};
 use parking_lot::RwLock;
 use std::sync::Arc;
 
+#[derive(Debug, Clone)]
+pub enum Message {
+    ToggleSidebar,
+    TogglePreview,
+    ToggleConsole,
+    EditorKey(EditorKey),
+    UndoEdit,
+    RedoEdit,
+    ToggleLineComment,
+    KeyboardShortcut(Shortcut),
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Shortcut {
+    Undo,
+    Redo,
+    ToggleComment,
+}
+
+#[derive(Debug, Clone)]
+pub enum EditorKey {
+    InsertText(String),
+    Enter,
+    Backspace,
+    Delete,
+    Tab { shift: bool },
+    Left { shift: bool, by_word: bool },
+    Right { shift: bool, by_word: bool },
+    Up { shift: bool },
+    Down { shift: bool },
+    Home { shift: bool },
+    End { shift: bool },
+    DocStart { shift: bool },
+    DocEnd { shift: bool },
+}
+
 pub struct TypstEditorApp {
-    state: Arc<RwLock<ApplicationState>>,
-    theme: Arc<RwLock<Theme>>,
+    pub state: Arc<RwLock<ApplicationState>>,
+    pub theme: Arc<RwLock<Theme>>,
 }
 
 impl TypstEditorApp {
-    pub fn new(_cx: &mut Context<Self>) -> Self {
+    fn new() -> Self {
         let config = Config::load();
-        let theme = if config.appearance.theme == "light" { Theme::light() } else { Theme::dark() };
+        let theme = if config.appearance.theme == "light" {
+            Theme::light()
+        } else {
+            Theme::dark()
+        };
 
-        let state = ApplicationState::new(config);
+        let mut app_state = ApplicationState::new(config);
+        app_state.add_window(0, WorkspaceState::new(0));
+        if let Some(workspace) = app_state.get_active_workspace() {
+            workspace.write().open_document(Document::new(None));
+        }
 
         Self {
-            state: Arc::new(RwLock::new(state)),
+            state: Arc::new(RwLock::new(app_state)),
             theme: Arc::new(RwLock::new(theme)),
         }
     }
 
-    pub fn open_main_window(&self, cx: &mut Context<Self>) {
-        let state = self.state.clone();
-        let theme = self.theme.clone();
+    fn update(&mut self, message: Message) -> Task<Message> {
+        match message {
+            Message::KeyboardShortcut(Shortcut::Undo) => return self.update(Message::UndoEdit),
+            Message::KeyboardShortcut(Shortcut::Redo) => return self.update(Message::RedoEdit),
+            Message::KeyboardShortcut(Shortcut::ToggleComment) => {
+                return self.update(Message::ToggleLineComment);
+            }
+            _ => {}
+        }
 
-        let window_id = cx
-            .open_window(WindowOptions::default(), |window, cx| {
-                let workspace = WorkspaceState::new(0);
-                state.write().add_window(0, workspace);
+        if let Some(workspace) = self.state.read().get_active_workspace() {
+            let mut workspace = workspace.write();
+            match message {
+                Message::ToggleSidebar => workspace.sidebar_visible = !workspace.sidebar_visible,
+                Message::TogglePreview => workspace.preview_visible = !workspace.preview_visible,
+                Message::ToggleConsole => workspace.console_visible = !workspace.console_visible,
+                Message::EditorKey(key) => {
+                    if let Some(editor) = workspace.get_active_editor() {
+                        let mut editor = editor.write();
+                        match key {
+                            EditorKey::InsertText(text) => editor.insert_text(&text),
+                            EditorKey::Enter => editor.insert_newline(),
+                            EditorKey::Backspace => editor.backspace(),
+                            EditorKey::Delete => editor.delete_forward(),
+                            EditorKey::Tab { shift } => {
+                                let cfg = workspace_state_config_tab_settings(&workspace);
+                                if shift {
+                                    editor.outdent_selection(cfg.0);
+                                } else {
+                                    editor.insert_tab(cfg.0, cfg.1);
+                                }
+                            }
+                            EditorKey::Left { shift, by_word } => {
+                                if by_word {
+                                    editor.move_word_left(shift);
+                                } else {
+                                    editor.move_left(shift);
+                                }
+                            }
+                            EditorKey::Right { shift, by_word } => {
+                                if by_word {
+                                    editor.move_word_right(shift);
+                                } else {
+                                    editor.move_right(shift);
+                                }
+                            }
+                            EditorKey::Up { shift } => editor.move_up(shift),
+                            EditorKey::Down { shift } => editor.move_down(shift),
+                            EditorKey::Home { shift } => editor.move_line_start(shift),
+                            EditorKey::End { shift } => editor.move_line_end(shift),
+                            EditorKey::DocStart { shift } => editor.move_document_start(shift),
+                            EditorKey::DocEnd { shift } => editor.move_document_end(shift),
+                        }
+                    }
+                }
+                Message::UndoEdit => {
+                    if let Some(editor) = workspace.get_active_editor() {
+                        editor.write().undo();
+                    }
+                }
+                Message::RedoEdit => {
+                    if let Some(editor) = workspace.get_active_editor() {
+                        editor.write().redo();
+                    }
+                }
+                Message::ToggleLineComment => {
+                    if let Some(editor) = workspace.get_active_editor() {
+                        editor.write().toggle_line_comment();
+                    }
+                }
+                Message::KeyboardShortcut(_) => {}
+            }
+        }
 
-                cx.new(|cx| MainWindow::new(state.clone(), theme.clone(), cx))
-            })
-            .unwrap();
+        Task::none()
+    }
+
+    fn view(&self) -> Element<'_, Message> {
+        main_window_view(&self.state, &self.theme)
+    }
+
+    fn subscription(&self) -> Subscription<Message> {
+        keyboard::on_key_press(|key: Key, modifiers: Modifiers| {
+            if !modifiers.command() {
+                return match key.as_ref() {
+                    Key::Named(key::Named::Enter) => Some(Message::EditorKey(EditorKey::Enter)),
+                    Key::Named(key::Named::Backspace) => {
+                        Some(Message::EditorKey(EditorKey::Backspace))
+                    }
+                    Key::Named(key::Named::Delete) => Some(Message::EditorKey(EditorKey::Delete)),
+                    Key::Named(key::Named::Tab) => Some(Message::EditorKey(EditorKey::Tab {
+                        shift: modifiers.shift(),
+                    })),
+                    Key::Named(key::Named::ArrowLeft) => Some(Message::EditorKey(EditorKey::Left {
+                        shift: modifiers.shift(),
+                        by_word: modifiers.alt(),
+                    })),
+                    Key::Named(key::Named::ArrowRight) => {
+                        Some(Message::EditorKey(EditorKey::Right {
+                            shift: modifiers.shift(),
+                            by_word: modifiers.alt(),
+                        }))
+                    }
+                    Key::Named(key::Named::ArrowUp) => {
+                        Some(Message::EditorKey(EditorKey::Up { shift: modifiers.shift() }))
+                    }
+                    Key::Named(key::Named::ArrowDown) => {
+                        Some(Message::EditorKey(EditorKey::Down { shift: modifiers.shift() }))
+                    }
+                    Key::Named(key::Named::Home) => {
+                        Some(Message::EditorKey(EditorKey::Home { shift: modifiers.shift() }))
+                    }
+                    Key::Named(key::Named::End) => {
+                        Some(Message::EditorKey(EditorKey::End { shift: modifiers.shift() }))
+                    }
+                    Key::Character(text) => {
+                        if modifiers.alt() || modifiers.control() {
+                            None
+                        } else {
+                            let normalized = normalize_insert_text(text, modifiers);
+                            Some(Message::EditorKey(EditorKey::InsertText(normalized)))
+                        }
+                    }
+                    _ => None,
+                };
+            }
+
+            match key.as_ref() {
+                Key::Character(text) if text.eq_ignore_ascii_case("z") && modifiers.shift() => {
+                    Some(Message::KeyboardShortcut(Shortcut::Redo))
+                }
+                Key::Character(text) if text.eq_ignore_ascii_case("z") => {
+                    Some(Message::KeyboardShortcut(Shortcut::Undo))
+                }
+                Key::Character("/") => Some(Message::KeyboardShortcut(Shortcut::ToggleComment)),
+                Key::Named(key::Named::ArrowLeft) => Some(Message::EditorKey(EditorKey::Left {
+                    shift: modifiers.shift(),
+                    by_word: true,
+                })),
+                Key::Named(key::Named::ArrowRight) => {
+                    Some(Message::EditorKey(EditorKey::Right {
+                        shift: modifiers.shift(),
+                        by_word: true,
+                    }))
+                }
+                Key::Named(key::Named::Home) => Some(Message::EditorKey(EditorKey::DocStart {
+                    shift: modifiers.shift(),
+                })),
+                Key::Named(key::Named::End) => Some(Message::EditorKey(EditorKey::DocEnd {
+                    shift: modifiers.shift(),
+                })),
+                Key::Named(key::Named::F5) => None,
+                _ => None,
+            }
+        })
+    }
+}
+
+pub fn run() -> iced::Result {
+    application("Typst Studio", TypstEditorApp::update, TypstEditorApp::view)
+        .subscription(TypstEditorApp::subscription)
+        .run_with(|| (TypstEditorApp::new(), Task::none()))
+}
+
+fn workspace_state_config_tab_settings(workspace: &WorkspaceState) -> (usize, bool) {
+    let _ = workspace;
+    (4, true)
+}
+
+fn normalize_insert_text(text: &str, modifiers: Modifiers) -> String {
+    if !modifiers.shift() {
+        return text.to_string();
+    }
+
+    if text.chars().count() != 1 {
+        return text.to_string();
+    }
+
+    let ch = text.chars().next().unwrap_or_default();
+    if ch.is_ascii_lowercase() {
+        ch.to_ascii_uppercase().to_string()
+    } else {
+        text.to_string()
     }
 }

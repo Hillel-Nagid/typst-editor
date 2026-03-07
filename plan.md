@@ -4,11 +4,11 @@
 
 ## Project Overview
 
-A high-performance native text editor for Typst documents with bidirectional text support (RTL/LTR), live preview capabilities, and full LSP integration, built using GPUI framework.
+A high-performance native text editor for Typst documents with bidirectional text support (RTL/LTR), live preview capabilities, and full LSP integration, built using the Iced framework.
 
 ## Technology Stack
 
-- **UI Framework**: GPUI (Rust-based GPU-accelerated UI)
+- **UI Framework**: Iced (Rust native GUI framework)
 - **Language**: Rust (Edition 2021)
 - **Text Processing**: Typst compiler + Typst LSP
 - **Text Rendering**: Unicode bidirectional algorithm (UAX #9) via `unicode-bidi` crate
@@ -80,7 +80,7 @@ typst-studio/
 
 **Development Environment:**
 
-- Hot reload for UI development using GPUI's development features
+- Hot reload for UI development using Iced-focused iteration workflows
 - Logging infrastructure with multiple verbosity levels
 - Debug overlays showing buffer state, bidi levels, LSP status
 - Performance profiling integration with Tracy or similar tools
@@ -108,7 +108,7 @@ license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
 # UI Framework
-gpui = { git = "https://github.com/zed-industries/zed" }
+iced = "0.13"
 
 # Async runtime
 tokio = { version = "1.35", features = ["full"] }
@@ -154,7 +154,7 @@ regex = "1.10"
 
 **Key Dependencies:**
 
-1. **GPUI**: The core UI framework, provides GPU-accelerated rendering and reactive state management
+1. **Iced**: The core UI framework, provides native rendering and message-driven state management
 2. **Ropey**: Efficient rope-based text buffer for handling large documents
 3. **Unicode-bidi**: Implementation of the Unicode Bidirectional Algorithm (UAX #9)
 4. **Typst**: The Typst compiler library for document compilation
@@ -182,7 +182,7 @@ x11 = { version = "2.21", features = ["xlib"] }
 
 **Application State Management:**
 
-The application uses a centralized state management approach with GPUI's reactive model:
+The application uses a centralized state management approach with Iced's message/update model:
 
 1. **ApplicationState**:
 
@@ -215,7 +215,7 @@ The application uses a centralized state management approach with GPUI's reactiv
 **Event Flow Architecture:**
 
 ```
-User Input → GPUI Event System → Action Dispatcher → State Updates → Re-render
+User Input → Iced Message Dispatch → Action Dispatcher → State Updates → Re-render
                                       ↓
                                   LSP Client → Typst LSP → Responses
                                       ↓
@@ -377,7 +377,7 @@ Hierarchical configuration system with four levels:
 
 **State Management Architecture:**
 
-The application maintains state at multiple levels using GPUI's reactive patterns:
+The application maintains state at multiple levels using Iced's update/view patterns:
 
 1. **Application-Level State:**
 
@@ -432,15 +432,15 @@ All shared state wrapped in `Arc<RwLock<T>>` for thread-safe access:
 
 ## Phase 2: UI Foundation & Components
 
-### 2.1 GPUI Setup & Window Management
+### 2.1 Iced Setup & Window Management
 
 **Core Window System:**
 
-The foundation of the application starts with proper GPUI initialization and window management. This system must handle multiple windows, platform-specific considerations, and provide a solid base for all UI components.
+The foundation of the application starts with proper Iced initialization and window management. This system must handle multiple windows, platform-specific considerations, and provide a solid base for all UI components.
 
 **Implementation Requirements:**
 
-- Initialize GPUI application with main event loop
+- Initialize Iced application with main event loop
 - Implement `WindowManager` to handle multiple independent windows
 - Create `MainWindow` component with proper DPI awareness for all platforms (Windows, macOS, Linux)
 - Set up window state persistence (size, position, maximized state, split configuration)
@@ -452,7 +452,7 @@ The foundation of the application starts with proper GPUI initialization and win
 
 **Key Files:**
 
-- `src/main.rs` - Application entry point and GPUI initialization
+- `src/main.rs` - Application entry point and Iced initialization
 - `crates/ui/workspace/window_manager.rs` - Window lifecycle management
 - `crates/ui/workspace/main_window.rs` - Main window component
 - `crates/ui/workspace/titlebar.rs` - Custom titlebar (Windows/Linux)
@@ -732,7 +732,7 @@ The editor UI must provide clean integration points for backend systems that wil
 - Cache rendered glyphs and line measurements
 - Batch rendering operations for multiple cursors
 - Debounce expensive operations (syntax highlighting, diagnostics)
-- Use GPU acceleration for text rendering via GPUI
+- Use Iced rendering pipeline for text and UI rendering
 
 **Key Files:**
 
@@ -4618,7 +4618,7 @@ pub trait LogOutput: Send + Sync {
 
 3. **UI Tests:**
 
-   - GPUI component testing
+   - Iced UI component testing
    - User interaction simulation
    - Layout calculations
 
@@ -4775,7 +4775,7 @@ mod tests {
 - ARIA labels for UI elements
 - Announce state changes
 - Document structure navigation
-- (Limited by GPUI's capabilities)
+- (Limited by current Iced integration capabilities)
 
 **Visual Accessibility:**
 

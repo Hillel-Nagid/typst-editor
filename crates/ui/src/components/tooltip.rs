@@ -1,56 +1,31 @@
 use crate::theme::Theme;
-use gpui::*;
-use parking_lot::RwLock;
-use std::sync::Arc;
+use iced::widget::{container, text};
+use iced::{Background, Border, Element, Padding};
 
-pub struct Tooltip {
-    theme: Arc<RwLock<Theme>>,
-    content: String,
+pub fn tooltip_view(
+    theme: &Theme,
+    content: impl Into<String>,
     visible: bool,
-}
-
-impl Tooltip {
-    pub fn new(theme: Arc<RwLock<Theme>>, content: impl Into<String>) -> Self {
-        Self {
-            theme,
-            content: content.into(),
-            visible: false,
-        }
+) -> Element<'static, crate::app::Message> {
+    if !visible {
+        return container(text("")).into();
     }
 
-    pub fn show(&mut self) {
-        self.visible = true;
-    }
+    let bg_color = theme.parse_color(&theme.background.panel);
+    let fg_color = theme.parse_color(&theme.foreground.panel);
+    let border_color = theme.parse_color(&theme.ui.border);
 
-    pub fn hide(&mut self) {
-        self.visible = false;
-    }
-}
-
-impl Render for Tooltip {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = self.theme.read();
-        let bg_color = theme.parse_color(&theme.background.panel);
-        let fg_color = theme.parse_color(&theme.foreground.panel);
-        let border_color = theme.parse_color(&theme.ui.border);
-
-        if !self.visible {
-            return div();
-        }
-
-        div()
-            .absolute()
-            .px_2()
-            .py_1()
-            .bg(bg_color)
-            .text_color(fg_color)
-            .border_1()
-            .border_color(border_color)
-            .rounded_md()
-            .text_xs()
-            .max_w_64()
-            .shadow_lg()
-            //TODO: fix z-index .z_index(9999)
-            .child(self.content.clone())
-    }
+    container(text(content.into()).size(12))
+        .padding(Padding::from([4.0, 6.0]))
+        .style(move |_| iced::widget::container::Style {
+            background: Some(Background::Color(bg_color)),
+            text_color: Some(fg_color),
+            border: Border {
+                color: border_color,
+                width: 1.0,
+                radius: 4.0.into(),
+            },
+            ..Default::default()
+        })
+        .into()
 }

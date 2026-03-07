@@ -1,5 +1,7 @@
 use crate::config::Config;
 use crate::document::{Document, DocumentId};
+use crate::editor_session::EditorSession;
+use crate::editor_session::MoveDirection;
 use crate::selection::MultiCursor;
 use parking_lot::RwLock;
 use std::collections::HashMap;
@@ -95,24 +97,149 @@ impl WorkspaceState {
 #[derive(Clone)]
 pub struct EditorState {
     pub document: Document,
-    pub content: String,
-    pub cursors: MultiCursor,
+    session: EditorSession,
     pub scroll_offset: f32,
 }
 
 impl EditorState {
     pub fn new(document: Document) -> Self {
+        let line_ending = document.line_ending;
         Self {
             document,
-            content: String::new(),
-            cursors: MultiCursor::default(),
+            session: EditorSession::new("", line_ending),
             scroll_offset: 0.0,
         }
     }
 
     pub fn set_content(&mut self, content: String) {
-        self.content = content;
+        self.session.set_text(content);
         self.document.mark_dirty();
+        self.document.increment_version();
+    }
+
+    pub fn content(&self) -> String {
+        self.session.text()
+    }
+
+    pub fn cursors(&self) -> &MultiCursor {
+        &self.session.cursors
+    }
+
+    pub fn insert_text(&mut self, text: &str) {
+        self.session.insert_text(text);
+        self.document.mark_dirty();
+        self.document.increment_version();
+    }
+
+    pub fn insert_char(&mut self, ch: char) {
+        self.session.insert_char_with_pairing(ch);
+        self.document.mark_dirty();
+        self.document.increment_version();
+    }
+
+    pub fn backspace(&mut self) {
+        self.session.delete_backward();
+        self.document.mark_dirty();
+        self.document.increment_version();
+    }
+
+    pub fn delete_forward(&mut self) {
+        self.session.delete_forward();
+        self.document.mark_dirty();
+        self.document.increment_version();
+    }
+
+    pub fn insert_newline(&mut self) {
+        self.session.insert_newline();
+        self.document.mark_dirty();
+        self.document.increment_version();
+    }
+
+    pub fn insert_tab(&mut self, tab_size: usize, insert_spaces: bool) {
+        self.session.insert_tab(tab_size, insert_spaces);
+        self.document.mark_dirty();
+        self.document.increment_version();
+    }
+
+    pub fn outdent_selection(&mut self, tab_size: usize) {
+        self.session.outdent_selected_lines(tab_size);
+        self.document.mark_dirty();
+        self.document.increment_version();
+    }
+
+    pub fn toggle_line_comment(&mut self) {
+        self.session.toggle_line_comment();
+        self.document.mark_dirty();
+        self.document.increment_version();
+    }
+
+    pub fn undo(&mut self) -> bool {
+        let changed = self.session.undo();
+        self.document.is_dirty = self.session.is_dirty();
+        changed
+    }
+
+    pub fn redo(&mut self) -> bool {
+        let changed = self.session.redo();
+        self.document.is_dirty = self.session.is_dirty();
+        changed
+    }
+
+    pub fn save_point(&mut self) {
+        self.session.mark_saved();
+        self.document.mark_clean();
+    }
+
+    pub fn line_count(&self) -> usize {
+        self.content().lines().count().max(1)
+    }
+
+    pub fn lines(&self) -> Vec<String> {
+        let text = self.content();
+        if text.is_empty() {
+            return vec![String::new()];
+        }
+        text.split('\n').map(|line| line.to_string()).collect()
+    }
+
+    pub fn move_left(&mut self, extend_selection: bool) {
+        self.session.move_cursor(MoveDirection::Left, extend_selection);
+    }
+
+    pub fn move_right(&mut self, extend_selection: bool) {
+        self.session.move_cursor(MoveDirection::Right, extend_selection);
+    }
+
+    pub fn move_up(&mut self, extend_selection: bool) {
+        self.session.move_cursor(MoveDirection::Up, extend_selection);
+    }
+
+    pub fn move_down(&mut self, extend_selection: bool) {
+        self.session.move_cursor(MoveDirection::Down, extend_selection);
+    }
+
+    pub fn move_word_left(&mut self, extend_selection: bool) {
+        self.session.move_cursor(MoveDirection::WordLeft, extend_selection);
+    }
+
+    pub fn move_word_right(&mut self, extend_selection: bool) {
+        self.session.move_cursor(MoveDirection::WordRight, extend_selection);
+    }
+
+    pub fn move_line_start(&mut self, extend_selection: bool) {
+        self.session.move_cursor(MoveDirection::LineStart, extend_selection);
+    }
+
+    pub fn move_line_end(&mut self, extend_selection: bool) {
+        self.session.move_cursor(MoveDirection::LineEnd, extend_selection);
+    }
+
+    pub fn move_document_start(&mut self, extend_selection: bool) {
+        self.session.move_cursor(MoveDirection::DocumentStart, extend_selection);
+    }
+
+    pub fn move_document_end(&mut self, extend_selection: bool) {
+        self.session.move_cursor(MoveDirection::DocumentEnd, extend_selection);
     }
 }
 

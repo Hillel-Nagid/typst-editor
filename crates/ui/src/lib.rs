@@ -9,5 +9,6 @@ pub mod navbar;
 pub mod console;
 
 pub use app::TypstEditorApp;
+pub use app::run;
 pub use theme::Theme;
 

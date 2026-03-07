@@ -1,6 +1,6 @@
 # Typst Studio
 
-A high-performance native cross-platform text editor for Typst documents with bidirectional text support, live preview, and full LSP integration, built with GPUI.
+A high-performance native cross-platform text editor for Typst documents with bidirectional text support, live preview, and full LSP integration, built with Iced.
 
 ## Features (Phase 1 & 2 Implementation)
 
@@ -15,7 +15,7 @@ A high-performance native cross-platform text editor for Typst documents with bi
 
 - **UI Foundation**
 
-  - GPUI-based application with GPU-accelerated rendering
+  - Iced-based application with native Rust UI rendering
   - Window management system
   - Dark and light theme support with customizable colors
   - Responsive layout with panel management
@@ -54,7 +54,7 @@ typst-studio/
 │   │   └── state.rs       # Application state management
 │   ├── typst_integration/ # Typst compiler and LSP (stubs)
 │   ├── preview/           # PDF preview rendering (stubs)
-│   └── ui/                # GPUI-based UI components
+│   └── ui/                # Iced-based UI components
 │       ├── app.rs         # Application entry point
 │       ├── theme.rs       # Theme system
 │       ├── workspace.rs   # Main window layout
@@ -143,7 +143,7 @@ All state is wrapped in `Arc<RwLock<T>>` for thread-safe concurrent access.
 
 ### Threading Model
 
-- **Main Thread**: UI rendering and event handling (GPUI)
+- **Main Thread**: UI rendering and event handling (Iced)
 - **LSP Thread**: Language server communication (Phase 5)
 - **Compiler Thread**: Document compilation (Phase 6)
 - **File Watcher Thread**: Filesystem monitoring (Phase 6)
@@ -151,7 +151,7 @@ All state is wrapped in `Arc<RwLock<T>>` for thread-safe concurrent access.
 ### Event Flow
 
 ```
-User Input → GPUI Events → Action Handlers → State Updates → UI Re-render
+User Input → Iced Messages → Action Handlers → State Updates → UI Re-render
 ```
 
 ## Development
@@ -186,6 +186,6 @@ See [plan.md](plan.md) for the complete implementation roadmap.
 
 ## Acknowledgments
 
-- Built with [GPUI](https://github.com/zed-industries/zed) framework
+- Built with [Iced](https://github.com/iced-rs/iced) framework
 - [Typst](https://github.com/typst/typst) document processor
 - Inspired by modern code editors (VS Code, Zed, etc.)

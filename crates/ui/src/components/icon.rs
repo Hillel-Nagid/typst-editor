@@ -1,7 +1,6 @@
 use crate::theme::Theme;
-use gpui::*;
-use parking_lot::RwLock;
-use std::sync::Arc;
+use iced::widget::text;
+use iced::Element;
 
 #[derive(Clone, Copy)]
 pub enum IconSize {
@@ -11,11 +10,11 @@ pub enum IconSize {
 }
 
 impl IconSize {
-    fn to_px(&self) -> Pixels {
+    fn to_px(&self) -> u16 {
         match self {
-            IconSize::Small => px(12.0),
-            IconSize::Medium => px(16.0),
-            IconSize::Large => px(24.0),
+            IconSize::Small => 12,
+            IconSize::Medium => 16,
+            IconSize::Large => 24,
         }
     }
 }
@@ -61,30 +60,18 @@ impl IconType {
 pub struct Icon {
     icon_type: IconType,
     size: IconSize,
-    theme: Arc<RwLock<Theme>>,
 }
 
 impl Icon {
-    pub fn new(icon_type: IconType, size: IconSize, theme: Arc<RwLock<Theme>>) -> Self {
-        Self {
-            icon_type,
-            size,
-            theme,
-        }
+    pub fn new(icon_type: IconType, size: IconSize) -> Self {
+        Self { icon_type, size }
     }
-}
 
-impl Render for Icon {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = self.theme.read();
+    pub fn view(self, theme: &Theme) -> Element<'static, crate::app::Message> {
         let color = theme.parse_color(&theme.foreground.editor);
-
-        div()
+        text(self.icon_type.to_emoji())
             .size(self.size.to_px())
-            .flex()
-            .items_center()
-            .justify_center()
-            .text_color(color)
-            .child(self.icon_type.to_emoji())
+            .color(color)
+            .into()
     }
 }

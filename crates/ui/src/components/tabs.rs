@@ -1,9 +1,6 @@
 use crate::theme::Theme;
-use gpui::*;
-use gpui::prelude::FluentBuilder;
-use parking_lot::RwLock;
-use std::sync::Arc;
-use crate::components::clickable::{ Clickable, ClickHandler };
+use iced::widget::{button, row, text};
+use iced::{Background, Border, Color, Element, Length, Padding};
 
 pub struct Tab {
     pub id: String,
@@ -13,100 +10,45 @@ pub struct Tab {
     pub closeable: bool,
 }
 
-pub struct Tabs {
-    theme: Arc<RwLock<Theme>>,
+pub fn tabs_view(
+    theme: &Theme,
     tabs: Vec<Tab>,
-    on_select: Option<ClickHandler>,
-    on_close: Option<ClickHandler>,
-}
+    on_select: impl Fn(String) -> crate::app::Message + Copy + 'static,
+) -> Element<'static, crate::app::Message> {
+    let border_color = theme.parse_color(&theme.ui.border);
+    let mut tabs_row = row![]
+        .width(Length::Fill)
+        .spacing(4)
+        .padding(Padding::from([4.0, 6.0]));
 
-impl Tabs {
-    pub fn new(theme: Arc<RwLock<Theme>>) -> Self {
-        Self {
-            theme,
-            tabs: Vec::new(),
-            on_select: None,
-            on_close: None,
-        }
+    for tab in tabs {
+        let label = if tab.is_dirty {
+            format!("{} ●", tab.label)
+        } else {
+            tab.label
+        };
+        let bg = if tab.is_active {
+            theme.parse_color(&theme.background.editor)
+        } else {
+            theme.parse_color(&theme.background.panel)
+        };
+        let id = tab.id;
+
+        let button = button(text(label).size(12))
+            .style(move |_, _| iced::widget::button::Style {
+                background: Some(Background::Color(bg)),
+                text_color: Color::WHITE,
+                border: Border {
+                    color: border_color,
+                    width: 1.0,
+                    radius: 3.0.into(),
+                },
+                ..Default::default()
+            })
+            .on_press(on_select(id));
+
+        tabs_row = tabs_row.push(button);
     }
 
-    pub fn add_tab(&mut self, tab: Tab) {
-        self.tabs.push(tab);
-    }
-
-    pub fn on_select(mut self, handler: ClickHandler) -> Self {
-        self.on_select = Some(handler);
-        self
-    }
-
-    pub fn on_close(mut self, handler: ClickHandler) -> Self {
-        self.on_close = Some(handler);
-        self
-    }
-}
-
-impl Render for Tabs {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = self.theme.read();
-        let bg_color = theme.parse_color(&theme.background.panel);
-        let border_color = theme.parse_color(&theme.ui.border);
-
-        let tabs = div()
-            .h_10()
-            .w_full()
-            .bg(bg_color)
-            .border_b_1()
-            .border_color(border_color)
-            .flex()
-            .flex_row()
-            .items_center()
-            //TODO: fix .overflow_x_scroll()
-            .children(
-                self.tabs.iter().map(|tab| {
-                    let active_bg = if tab.is_active {
-                        theme.parse_color(&theme.background.editor)
-                    } else {
-                        bg_color
-                    };
-                    let fg_color = theme.parse_color(&theme.foreground.panel);
-                    let on_select = self.on_select.clone();
-                    let on_close = self.on_close.clone();
-                    let tab_id = tab.id.clone();
-                    let tab_id_close = tab.id.clone();
-
-                    div()
-                        .h_full()
-                        .px_4()
-                        .flex()
-                        .flex_row()
-                        .items_center()
-                        .gap_2()
-                        .bg(active_bg)
-                        .text_color(fg_color)
-                        .border_r_1()
-                        .border_color(border_color)
-                        .cursor_pointer()
-                        // .when_some(on_select.clone(), |this, handler| {
-                        //     this.on_mouse_down(
-                        //         MouseButton::Left,
-                        //         move |_mouse_event, _window, cx| handler(tab_id.clone(), &mut cx) // TODO: fix handler type
-                        //     )
-                        // })
-                        .when(tab.is_dirty, |this| { this.child(div().child("●").text_xs()) })
-                        .child(div().child(tab.label.clone()))
-                        .when(tab.closeable, |this| {
-                            this.child(
-                                div()
-                                    .child("✕")
-                                    .text_xs()
-                                    .opacity(0.6)
-                                    .hover(|style| style.opacity(1.0))
-                            )
-                        })
-                })
-            );
-        Clickable::new(tabs).when_some(self.on_select.clone(), |clickable, handler| {
-            clickable.on_click(handler)
-        })
-    }
+    tabs_row.into()
 }

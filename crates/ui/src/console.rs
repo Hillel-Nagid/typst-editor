@@ -1,64 +1,33 @@
 use crate::theme::Theme;
-use gpui::*;
-use parking_lot::RwLock;
-use std::sync::Arc;
+use iced::widget::{column, container, row, text};
+use iced::{Background, Border, Element, Length, Padding};
 
-pub struct ConsolePanel {
-    theme: Arc<RwLock<Theme>>,
-}
+pub fn console_view(theme: &Theme) -> Element<'static, crate::app::Message> {
+    let bg_color = theme.parse_color(&theme.background.panel);
+    let fg_color = theme.parse_color(&theme.foreground.panel);
+    let border_color = theme.parse_color(&theme.ui.border);
 
-impl ConsolePanel {
-    pub fn new(theme: Arc<RwLock<Theme>>, _cx: &mut Context<Self>) -> Self {
-        Self { theme }
-    }
-}
+    let content = column![
+        row![text("Problems"), text("Output"), text("Terminal")]
+            .spacing(16)
+            .padding(Padding::from([0.0, 4.0])),
+        text("No problems detected").size(13),
+    ]
+    .spacing(10);
 
-impl Render for ConsolePanel {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
-        let theme = self.theme.read();
-        let bg_color = theme.parse_color(&theme.background.panel);
-        let fg_color = theme.parse_color(&theme.foreground.panel);
-
-        div()
-            .h_48()
-            .w_full()
-            .bg(bg_color)
-            .text_color(fg_color)
-            .flex()
-            .flex_col()
-            .border_t_1()
-            .border_color(theme.parse_color(&theme.ui.border))
-            // Console header
-            .child(
-                div()
-                    .h_8()
-                    .w_full()
-                    .flex()
-                    .flex_row()
-                    .items_center()
-                    .justify_between()
-                    .px_2()
-                    .border_b_1()
-                    .border_color(theme.parse_color(&theme.ui.border))
-                    .child(
-                        div()
-                            .flex()
-                            .flex_row()
-                            .gap_4()
-                            .text_sm()
-                            .child(div().font_weight(FontWeight::BOLD).child("Problems"))
-                            .child(div().opacity(0.7).child("Output"))
-                            .child(div().opacity(0.7).child("Terminal"))
-                    )
-                    .child(div().text_sm().child("✕"))
-            )
-            // Console content
-            .child(
-                div()
-                    .flex_1()
-                    .text_sm()
-                    //TODO: add scroll and padding
-                    .child(div().opacity(0.6).child("No problems detected"))
-            )
-    }
+    container(content)
+        .width(Length::Fill)
+        .height(Length::Fixed(180.0))
+        .padding(Padding::from([8.0, 10.0]))
+        .style(move |_| iced::widget::container::Style {
+            background: Some(Background::Color(bg_color)),
+            text_color: Some(fg_color),
+            border: Border {
+                color: border_color,
+                width: 1.0,
+                radius: 0.0.into(),
+            },
+            ..Default::default()
+        })
+        .into()
 }
